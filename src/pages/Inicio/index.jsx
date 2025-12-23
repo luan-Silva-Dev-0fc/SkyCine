@@ -42,7 +42,7 @@ export default function Home() {
           style={styles.menuIcon}
           onClick={() => setMenuOpen(true)}
         />
-        <h1 style={styles.title}>Bem-vindo ao SkyCine</h1>
+        <h1 style={styles.title}>SkyCine</h1>
       </header>
 
       {menuOpen && (
@@ -99,105 +99,137 @@ export default function Home() {
 const styles = {
   container: {
     minHeight: "100vh",
-    background: "#050505",
-    color: "#e5e5e5",
+    background: "linear-gradient(180deg, #050505, #0a0a0a)",
+    color: "#fff",
+    fontFamily: "system-ui, -apple-system, BlinkMacSystemFont",
   },
 
-  header: {
-    display: "flex",
-    alignItems: "center",
-    gap: "14px",
-    padding: "18px",
-    borderBottom: "1px solid #111",
-  },
+header: {
+  position: "sticky",
+  top: 0,
+  zIndex: 20,
+  display: "flex",
+  alignItems: "center",
+  padding: "18px 24px",
+  backdropFilter: "blur(10px)",
+  background: "rgba(5,5,5,0.7)",
+  borderBottom: "1px solid rgba(255,255,255,0.05)",
+  position: "relative",
+},
+
 
   menuIcon: {
-    width: "26px",
+    width: "28px",
     cursor: "pointer",
     filter: "invert(1)",
+    transition: "transform .2s ease",
   },
 
   title: {
-    fontSize: "18px",
-    fontWeight: "600",
-  },
+  position: "absolute",
+  left: "50%",
+  transform: "translateX(-50%)",
+  fontSize: "20px",
+  fontWeight: "700",
+  letterSpacing: "0.5px",
+  pointerEvents: "none", // evita atrapalhar o clique no menu
+},
+
 
   overlay: {
     position: "fixed",
     inset: 0,
-    background: "rgba(0,0,0,0.7)",
-    zIndex: 10,
+    background: "rgba(0,0,0,0.6)",
+    backdropFilter: "blur(4px)",
+    zIndex: 30,
   },
 
   menu: {
-    width: "260px",
+    width: "270px",
     height: "100%",
-    background: "#0d0d0d",
-    padding: "20px",
+    background: "linear-gradient(180deg, #0c0c0c, #111)",
+    padding: "24px",
     display: "flex",
     flexDirection: "column",
-    gap: "12px",
+    gap: "14px",
+    boxShadow: "10px 0 40px rgba(0,0,0,.6)",
+    animation: "slideIn .25s ease",
   },
 
   menuButton: {
     padding: "14px",
-    background: "#121212",
-    border: "1px solid #1f1f1f",
-    borderRadius: "10px",
-    color: "#e0e0e0",
+    background: "rgba(255,255,255,0.04)",
+    border: "1px solid rgba(255,255,255,0.08)",
+    borderRadius: "12px",
+    color: "#fff",
     cursor: "pointer",
-    fontSize: "14px",
+    fontSize: "15px",
+    transition: "all .2s ease",
   },
 
   grid: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))",
-    gap: "24px",
-    padding: "24px",
+    gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+    gap: "26px",
+    padding: "30px",
   },
 
   card: {
-    background: "#0c0c0c",
-    borderRadius: "16px",
+    position: "relative",
+    background: "rgba(255,255,255,0.03)",
+    borderRadius: "18px",
     padding: "10px",
+    overflow: "hidden",
+    transition: "transform .25s ease, box-shadow .25s ease",
+    boxShadow: "0 10px 30px rgba(0,0,0,.4)",
   },
 
   capa: {
     width: "100%",
-    borderRadius: "12px",
+    borderRadius: "14px",
+    aspectRatio: "2/3",
+    objectFit: "cover",
   },
 
   filmeTitulo: {
-    margin: "12px 0",
+    margin: "14px 0 10px",
     fontSize: "14px",
     textAlign: "center",
+    fontWeight: "500",
+    lineHeight: "1.3",
+    display: "-webkit-box",
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: "vertical",
+    overflow: "hidden",
   },
 
   assistir: {
     width: "100%",
-    padding: "10px",
-    background: "#1f1f1f",
-    border: "1px solid #2a2a2a",
-    borderRadius: "10px",
+    padding: "12px",
+    background: "linear-gradient(135deg, #e50914, #b20710)",
+    border: "none",
+    borderRadius: "12px",
     color: "#fff",
     cursor: "pointer",
-    fontWeight: "600",
+    fontWeight: "700",
+    letterSpacing: "0.3px",
+    transition: "transform .2s ease, filter .2s ease",
   },
 
   destaquesSection: {
-    padding: "40px 24px",
-    borderTop: "1px solid #111",
+    padding: "50px 30px",
+    borderTop: "1px solid rgba(255,255,255,0.06)",
   },
 
   destaquesTitulo: {
-    marginBottom: "20px",
-    fontSize: "18px",
-    fontWeight: "600",
+    marginBottom: "24px",
+    fontSize: "22px",
+    fontWeight: "700",
   },
 
   destaquesGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-    gap: "22px",
+    gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+    gap: "26px",
   },
 };
