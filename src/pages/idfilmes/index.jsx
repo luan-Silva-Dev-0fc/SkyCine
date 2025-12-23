@@ -9,7 +9,6 @@ import {
 } from "firebase/firestore";
 
 export default function Assistir() {
-  /* ================= FIREBASE ================= */
   const firebaseConfig = {
     apiKey: "AIzaSyDz6mdcZQ_Z3815u50nJCjqy4GEOyndn5k",
     authDomain: "skycine-c59b0.firebaseapp.com",
@@ -22,12 +21,10 @@ export default function Assistir() {
   const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
   const db = getFirestore(app);
 
-  /* ================= STATES ================= */
   const [filme, setFilme] = useState(null);
   const [media, setMedia] = useState("0.0");
   const [avaliado, setAvaliado] = useState(false);
 
-  /* ================= CARREGAR FILME ================= */
   useEffect(() => {
     async function carregarFilme() {
       const id = new URLSearchParams(window.location.search).get("id");
@@ -49,7 +46,6 @@ export default function Assistir() {
     carregarFilme();
   }, []);
 
-  /* ================= AVALIAR ================= */
   async function avaliar(nota) {
     if (avaliado || !filme) return;
 
@@ -64,27 +60,57 @@ export default function Assistir() {
   }
 
   if (!filme) {
-    return <div style={styles.loading}>Carregando filme...</div>;
+    return <div style={styles.loading}>Carregando conteúdo...</div>;
   }
 
   return (
     <div style={styles.container}>
-      <div style={styles.card}>
-        {/* TOPO */}
-        <div style={styles.header}>
-          <img src={filme.capa} style={styles.capa} />
-          <div>
-            <h1 style={styles.titulo}>{filme.titulo}</h1>
-            <p style={styles.media}>Nota média: {media}</p>
+      <div
+        style={{
+          ...styles.hero,
+          backgroundImage: `url(${filme.capa})`,
+        }}
+      >
+        <div style={styles.heroOverlay} />
+        <div style={styles.heroContent}>
+          <h1 style={styles.heroTitle}>{filme.titulo}</h1>
+          <p style={styles.heroSubtitle}>
+            Avaliação média {media}
+          </p>
+        </div>
+      </div>
+
+      <div style={styles.content}>
+        <div style={styles.infoBox}>
+          <img src={filme.capa} style={styles.poster} />
+
+          <div style={styles.details}>
+            <h2 style={styles.title}>{filme.titulo}</h2>
+
+            <p style={styles.description}>
+              Assista a este título em alta qualidade, com reprodução fluida e
+              interface focada na experiência do usuário.
+            </p>
+
+            <div style={styles.meta}>
+              <span>Alta definição</span>
+              <span>Streaming contínuo</span>
+              <span>Disponível agora</span>
+            </div>
+
+            <p style={styles.rating}>
+              Nota média dos usuários: <strong>{media}</strong>
+            </p>
           </div>
         </div>
 
-        {/* PLAYER */}
         <video src={filme.filme} controls style={styles.video} />
 
-        {/* AVALIAÇÃO */}
         <div style={styles.avaliacaoBox}>
-          <p style={styles.avaliarTexto}>Avalie este filme</p>
+          <h3 style={styles.avaliarTitulo}>Avaliação</h3>
+          <p style={styles.avaliarTexto}>
+            Sua opinião contribui para a qualidade da plataforma.
+          </p>
 
           <div style={styles.estrelas}>
             {[1, 2, 3, 4, 5].map((n) => (
@@ -93,13 +119,13 @@ export default function Assistir() {
                 style={styles.estrela}
                 onClick={() => avaliar(n)}
               >
-                ☆
+                ★
               </span>
             ))}
           </div>
 
           {avaliado && (
-            <p style={styles.msg}>🎉 Obrigado pela sua avaliação!</p>
+            <p style={styles.msg}>Avaliação registrada com sucesso.</p>
           )}
         </div>
       </div>
@@ -107,116 +133,140 @@ export default function Assistir() {
   );
 }
 
-/* ================= STYLES ================= */
 const styles = {
   container: {
-    background: "linear-gradient(135deg, #1f1c2c, #928dab)",
-    backgroundSize: "400% 400%",
-    animation: "gradientAnim 15s ease infinite",
+    background: "#0f172a",
     minHeight: "100vh",
-    display: "flex",
-    justifyContent: "center",
-    padding: "20px",
     color: "#fff",
-  },
-
-  card: {
-    width: "100%",
-    maxWidth: "900px",
-    background: "rgba(0,0,0,0.6)",
-    borderRadius: "12px",
-    padding: "20px",
-    boxShadow: "0 0 20px rgba(0,0,0,0.5)",
+    fontFamily: "Inter, sans-serif",
   },
 
   loading: {
-    background: "#000",
-    color: "#fff",
     minHeight: "100vh",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
+    background: "#000",
+    fontSize: "18px",
   },
 
-  header: {
-    display: "flex",
-    gap: "16px",
-    alignItems: "center",
-    marginBottom: "20px",
+  hero: {
+    height: "320px",
+    backgroundSize: "cover",
+    backgroundPosition: "center",
+    position: "relative",
   },
 
-  capa: {
-    width: "90px",
-    height: "130px",
-    objectFit: "cover",
-    borderRadius: "6px",
-    flexShrink: 0,
-    boxShadow: "0 0 10px rgba(0,0,0,0.5)",
+  heroOverlay: {
+    position: "absolute",
+    inset: 0,
+    background:
+      "linear-gradient(to top, rgba(15,23,42,1), rgba(15,23,42,0.6))",
   },
 
-  titulo: {
-    fontSize: "24px",
-    fontWeight: "700",
-    marginBottom: "6px",
-    textShadow: "1px 1px 4px rgba(0,0,0,0.7)",
+  heroContent: {
+    position: "absolute",
+    bottom: "30px",
+    left: "30px",
   },
 
-  media: {
-    color: "#ccc",
+  heroTitle: {
+    fontSize: "32px",
+    fontWeight: "800",
+  },
+
+  heroSubtitle: {
     fontSize: "15px",
+    color: "#cbd5f5",
+  },
+
+  content: {
+    maxWidth: "1000px",
+    margin: "0 auto",
+    padding: "30px 20px",
+  },
+
+  infoBox: {
+    display: "flex",
+    gap: "24px",
+    marginBottom: "30px",
+  },
+
+  poster: {
+    width: "160px",
+    borderRadius: "10px",
+    boxShadow: "0 15px 40px rgba(0,0,0,0.6)",
+  },
+
+  details: {
+    flex: 1,
+  },
+
+  title: {
+    fontSize: "26px",
+    fontWeight: "700",
+    marginBottom: "10px",
+  },
+
+  description: {
+    fontSize: "15px",
+    color: "#cbd5f5",
+    lineHeight: "1.6",
+    marginBottom: "14px",
+  },
+
+  meta: {
+    display: "flex",
+    gap: "14px",
+    fontSize: "13px",
+    color: "#94a3b8",
+    marginBottom: "12px",
+  },
+
+  rating: {
+    fontSize: "15px",
+    color: "#e5e7eb",
   },
 
   video: {
     width: "100%",
-    borderRadius: "10px",
-    marginBottom: "20px",
+    borderRadius: "14px",
     background: "#000",
-    boxShadow: "0 0 20px rgba(0,0,0,0.5)",
+    marginBottom: "30px",
   },
 
   avaliacaoBox: {
     textAlign: "center",
-    marginTop: "10px",
+    padding: "25px",
+    background: "rgba(255,255,255,0.04)",
+    borderRadius: "14px",
+  },
+
+  avaliarTitulo: {
+    fontSize: "20px",
+    marginBottom: "6px",
   },
 
   avaliarTexto: {
-    fontSize: "16px",
-    marginBottom: "12px",
-    color: "#eee",
+    fontSize: "14px",
+    color: "#94a3b8",
+    marginBottom: "14px",
   },
 
   estrelas: {
-    fontSize: "36px",
+    fontSize: "34px",
     letterSpacing: "6px",
     cursor: "pointer",
   },
 
   estrela: {
     color: "#facc15",
-    transition: "all 0.3s ease",
-  },
-
-  estrelaHover: {
-    transform: "translateY(-8px) scale(1.3)",
+    transition: "transform 0.25s ease",
   },
 
   msg: {
-    marginTop: "15px",
+    marginTop: "12px",
     color: "#38bdf8",
-    fontSize: "16px",
-    fontWeight: "600",
-    animation: "fadeIn 1s ease forwards",
-  },
-
-  // Keyframes
-  "@keyframes gradientAnim": {
-    "0%": { backgroundPosition: "0% 50%" },
-    "50%": { backgroundPosition: "100% 50%" },
-    "100%": { backgroundPosition: "0% 50%" },
-  },
-
-  "@keyframes fadeIn": {
-    "0%": { opacity: 0 },
-    "100%": { opacity: 1 },
+    fontSize: "14px",
   },
 };

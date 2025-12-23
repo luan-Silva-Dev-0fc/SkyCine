@@ -54,8 +54,9 @@ export default function Home() {
             <button style={styles.menuButton} onClick={() => router.push("/acao")}>Ação</button>
             <button style={styles.menuButton} onClick={() => router.push("/animes")}>Animes</button>
             <button style={styles.menuButton} onClick={() => router.push("/iptv")}>IPTV</button>
-            <button style={styles.menuButton} onClick={() => router.push("/configuracoes")}>Configurações</button>
             <button style={styles.menuButton} onClick={() => router.push("/mais-opcoes")}>Mais opções</button>
+            <button style={styles.menuButton} onClick={() => router.push("/configuracoes")}>Configurações</button>
+            
           </aside>
         </div>
       )}
