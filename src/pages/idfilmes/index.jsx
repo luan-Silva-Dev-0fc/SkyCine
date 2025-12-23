@@ -64,24 +64,37 @@ export default function Assistir() {
         />
         <div className="absolute inset-0 bg-black/70" />
 
-        {/* CONTEÚDO DO TOPO */}
-        <div className="relative max-w-6xl mx-auto px-4 pt-10 pb-6">
+        {/* CONTEÚDO */}
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 pt-8 sm:pt-10 pb-6">
           {/* TÍTULO */}
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-red-600">
+          <h1
+            className="font-bold text-red-600 leading-tight"
+            style={{ fontSize: "clamp(1.5rem, 4vw, 2.5rem)" }}
+          >
             {filme.titulo}
           </h1>
-          <p className="text-sm text-gray-300 mt-1">
+
+          <p className="text-gray-300 text-sm sm:text-base mt-1">
             Avaliação média {media}
           </p>
 
           {/* PLAYER */}
-          <div className="relative mt-5">
+          <div className="relative mt-4 sm:mt-6">
             <video
               ref={videoRef}
               src={filme.filme}
               preload="metadata"
               controls={playing}
-              className="w-full max-h-[65vh] rounded-2xl bg-black shadow-2xl"
+              className="
+                w-full
+                rounded-2xl
+                bg-black
+                shadow-2xl
+                max-h-[55vh]
+                sm:max-h-[60vh]
+                md:max-h-[65vh]
+                lg:max-h-[70vh]
+              "
             />
 
             {!playing && (
@@ -92,7 +105,15 @@ export default function Assistir() {
                 }}
                 className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-2xl"
               >
-                <div className="w-16 h-16 sm:w-20 sm:h-20 bg-red-600 rounded-full flex items-center justify-center text-2xl">
+                <div
+                  className="
+                    bg-red-600 rounded-full flex items-center justify-center
+                    w-14 h-14
+                    sm:w-16 sm:h-16
+                    md:w-20 md:h-20
+                    text-xl sm:text-2xl
+                  "
+                >
                   ▶
                 </div>
               </button>
@@ -102,16 +123,25 @@ export default function Assistir() {
       </section>
 
       {/* DETALHES */}
-      <section className="max-w-6xl mx-auto px-4 py-8">
-        <div className="flex flex-col sm:flex-row gap-6">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
+        <div className="flex flex-col sm:flex-row gap-6 sm:gap-8">
           <img
             src={filme.capa}
-            className="w-full sm:w-52 h-72 object-cover rounded-xl shadow-xl"
             loading="lazy"
+            className="
+              w-full
+              sm:w-48
+              md:w-56
+              h-64
+              sm:h-72
+              object-cover
+              rounded-xl
+              shadow-xl
+            "
           />
 
           <div className="flex-1">
-            <div className="flex flex-wrap gap-2 mb-3 text-xs text-gray-300">
+            <div className="flex flex-wrap gap-2 mb-3 text-xs sm:text-sm text-gray-300">
               <span className="px-3 py-1 rounded-full bg-white/10">HD</span>
               <span className="px-3 py-1 rounded-full bg-white/10">Online</span>
               <span className="px-3 py-1 rounded-full bg-white/10">
@@ -119,7 +149,7 @@ export default function Assistir() {
               </span>
             </div>
 
-            <p className="text-gray-300 text-sm leading-relaxed">
+            <p className="text-gray-300 text-sm sm:text-base leading-relaxed max-w-3xl">
               {filme.descricao ||
                 "Assista com qualidade máxima e reprodução fluida."}
             </p>
