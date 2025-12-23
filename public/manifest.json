@@ -1,0 +1,16 @@
+{
+  "name": "MDS",
+  "short_name": "MDS",
+  "start_url": "/?homescreen=true",
+  "display": "standalone",
+  "background_color": "#1D1D1D",
+  "theme_color": "#1D1D1D",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}
