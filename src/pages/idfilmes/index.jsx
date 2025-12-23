@@ -1,12 +1,8 @@
-import { useEffect, useState } from "react";
+"use client";
+
+import { useEffect, useRef, useState } from "react";
 import { initializeApp, getApps, getApp } from "firebase/app";
-import {
-  getFirestore,
-  doc,
-  getDoc,
-  updateDoc,
-  increment,
-} from "firebase/firestore";
+import { getFirestore, doc, getDoc } from "firebase/firestore";
 
 export default function Assistir() {
   const firebaseConfig = {
@@ -23,7 +19,9 @@ export default function Assistir() {
 
   const [filme, setFilme] = useState(null);
   const [media, setMedia] = useState("0.0");
-  const [avaliado, setAvaliado] = useState(false);
+  const [menu, setMenu] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const videoRef = useRef(null);
 
   useEffect(() => {
     async function carregarFilme() {
@@ -36,7 +34,6 @@ export default function Assistir() {
       if (snap.exists()) {
         const data = snap.data();
         setFilme({ id, ...data });
-
         if (data.totalVotos) {
           setMedia((data.avaliacao / data.totalVotos).toFixed(1));
         }
@@ -46,227 +43,104 @@ export default function Assistir() {
     carregarFilme();
   }, []);
 
-  async function avaliar(nota) {
-    if (avaliado || !filme) return;
+  function playVideo() {
+    if (videoRef.current) {
+      videoRef.current.play();
+      setPlaying(true);
+    }
+  }
 
-    const ref = doc(db, "filmes", filme.id);
-
-    await updateDoc(ref, {
-      avaliacao: increment(nota),
-      totalVotos: increment(1),
-    });
-
-    setAvaliado(true);
+  function fullscreen() {
+    if (videoRef.current?.requestFullscreen) videoRef.current.requestFullscreen();
   }
 
   if (!filme) {
-    return <div style={styles.loading}>Carregando conteúdo...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-black text-white text-lg">
+        Carregando conteúdo...
+      </div>
+    );
   }
 
   return (
-    <div style={styles.container}>
-      <div
-        style={{
-          ...styles.hero,
-          backgroundImage: `url(${filme.capa})`,
-        }}
-      >
-        <div style={styles.heroOverlay} />
-        <div style={styles.heroContent}>
-          <h1 style={styles.heroTitle}>{filme.titulo}</h1>
-          <p style={styles.heroSubtitle}>
-            Avaliação média {media}
-          </p>
+    <div className="min-h-screen bg-black text-white">
+      <div className="relative w-full h-80 md:h-[450px] lg:h-[550px] overflow-hidden">
+        <div
+          className="absolute inset-0 bg-cover bg-center scale-105 blur-2xl"
+          style={{ backgroundImage: `url(${filme.capa})` }}
+        />
+        <div className="absolute inset-0 bg-black/70" />
+        <div className="absolute bottom-6 left-6 z-10">
+          <h1 className="text-3xl md:text-5xl font-bold text-red-600">{filme.titulo}</h1>
+          <p className="text-gray-300 text-sm mt-1">Avaliação média {media}</p>
         </div>
+        <button
+          onClick={() => setMenu(!menu)}
+          className="absolute top-6 right-6 w-10 h-10 flex flex-col justify-between items-center p-1 bg-white/10 rounded-full z-20"
+        >
+          <span className="w-1.5 h-1.5 bg-white rounded-full"></span>
+          <span className="w-1.5 h-1.5 bg-white rounded-full"></span>
+          <span className="w-1.5 h-1.5 bg-white rounded-full"></span>
+        </button>
+
+        {menu && (
+          <div className="absolute top-16 right-6 bg-black/80 backdrop-blur-xl rounded-xl p-3 space-y-2 shadow-2xl z-20">
+            <button
+              onClick={fullscreen}
+              className="block w-full text-left px-4 py-2 rounded-lg hover:bg-white/10"
+            >
+              Tela cheia
+            </button>
+            <div className="px-4 py-2 text-sm text-gray-300">
+              Qualidade {videoRef.current?.videoWidth}x{videoRef.current?.videoHeight || "auto"}
+            </div>
+            <div className="px-4 py-2 text-sm text-gray-300">Espelhamento</div>
+          </div>
+        )}
       </div>
 
-      <div style={styles.content}>
-        <div style={styles.infoBox}>
-          <img src={filme.capa} style={styles.poster} />
-
-          <div style={styles.details}>
-            <h2 style={styles.title}>{filme.titulo}</h2>
-
-            <p style={styles.description}>
-              Assista a este título em alta qualidade, com reprodução fluida e
-              interface focada na experiência do usuário.
-            </p>
-
-            <div style={styles.meta}>
-              <span>Alta definição</span>
-              <span>Streaming contínuo</span>
-              <span>Disponível agora</span>
+      <div className="max-w-6xl mx-auto px-4 py-10 space-y-10">
+        <div className="flex flex-col md:flex-row gap-6 md:gap-10 items-start">
+          <img
+            src={filme.capa}
+            className="w-full md:w-60 h-80 object-cover rounded-2xl shadow-2xl"
+          />
+          <div className="flex-1">
+            <h2 className="text-2xl md:text-3xl font-semibold mb-3">{filme.titulo}</h2>
+            <div className="flex flex-wrap gap-3 text-sm text-gray-300 mb-4">
+              <span className="px-3 py-1 rounded-full bg-white/10">Alta definição</span>
+              <span className="px-3 py-1 rounded-full bg-white/10">Streaming contínuo</span>
+              <span className="px-3 py-1 rounded-full bg-white/10">Disponível agora</span>
             </div>
-
-            <p style={styles.rating}>
-              Nota média dos usuários: <strong>{media}</strong>
+            <p className="text-gray-300 text-sm leading-relaxed">
+              {filme.descricao || "Assista a este título em alta qualidade, com reprodução fluida e interface moderna."}
             </p>
+            <p className="mt-4 text-gray-200">Avaliação média: <strong>{media}</strong></p>
           </div>
         </div>
 
-        <video src={filme.filme} controls style={styles.video} />
+        <div className="relative group">
+          <video
+            ref={videoRef}
+            src={filme.filme}
+            controls={playing}
+            className="w-full rounded-2xl shadow-2xl bg-black"
+          />
 
-        <div style={styles.avaliacaoBox}>
-          <h3 style={styles.avaliarTitulo}>Avaliação</h3>
-          <p style={styles.avaliarTexto}>
-            Sua opinião contribui para a qualidade da plataforma.
-          </p>
-
-          <div style={styles.estrelas}>
-            {[1, 2, 3, 4, 5].map((n) => (
-              <span
-                key={n}
-                style={styles.estrela}
-                onClick={() => avaliar(n)}
-              >
-                ★
-              </span>
-            ))}
-          </div>
-
-          {avaliado && (
-            <p style={styles.msg}>Avaliação registrada com sucesso.</p>
+          {!playing && (
+            <button
+              onClick={playVideo}
+              className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-2xl transition group-hover:bg-black/60"
+            >
+              <div className="w-20 h-20 rounded-full bg-red-600 flex items-center justify-center shadow-2xl">
+                <svg viewBox="0 0 24 24" fill="white" className="w-10 h-10 ml-1">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              </div>
+            </button>
           )}
         </div>
       </div>
     </div>
   );
 }
-
-const styles = {
-  container: {
-    background: "#0f172a",
-    minHeight: "100vh",
-    color: "#fff",
-    fontFamily: "Inter, sans-serif",
-  },
-
-  loading: {
-    minHeight: "100vh",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "#000",
-    fontSize: "18px",
-  },
-
-  hero: {
-    height: "320px",
-    backgroundSize: "cover",
-    backgroundPosition: "center",
-    position: "relative",
-  },
-
-  heroOverlay: {
-    position: "absolute",
-    inset: 0,
-    background:
-      "linear-gradient(to top, rgba(15,23,42,1), rgba(15,23,42,0.6))",
-  },
-
-  heroContent: {
-    position: "absolute",
-    bottom: "30px",
-    left: "30px",
-  },
-
-  heroTitle: {
-    fontSize: "32px",
-    fontWeight: "800",
-  },
-
-  heroSubtitle: {
-    fontSize: "15px",
-    color: "#cbd5f5",
-  },
-
-  content: {
-    maxWidth: "1000px",
-    margin: "0 auto",
-    padding: "30px 20px",
-  },
-
-  infoBox: {
-    display: "flex",
-    gap: "24px",
-    marginBottom: "30px",
-  },
-
-  poster: {
-    width: "160px",
-    borderRadius: "10px",
-    boxShadow: "0 15px 40px rgba(0,0,0,0.6)",
-  },
-
-  details: {
-    flex: 1,
-  },
-
-  title: {
-    fontSize: "26px",
-    fontWeight: "700",
-    marginBottom: "10px",
-  },
-
-  description: {
-    fontSize: "15px",
-    color: "#cbd5f5",
-    lineHeight: "1.6",
-    marginBottom: "14px",
-  },
-
-  meta: {
-    display: "flex",
-    gap: "14px",
-    fontSize: "13px",
-    color: "#94a3b8",
-    marginBottom: "12px",
-  },
-
-  rating: {
-    fontSize: "15px",
-    color: "#e5e7eb",
-  },
-
-  video: {
-    width: "100%",
-    borderRadius: "14px",
-    background: "#000",
-    marginBottom: "30px",
-  },
-
-  avaliacaoBox: {
-    textAlign: "center",
-    padding: "25px",
-    background: "rgba(255,255,255,0.04)",
-    borderRadius: "14px",
-  },
-
-  avaliarTitulo: {
-    fontSize: "20px",
-    marginBottom: "6px",
-  },
-
-  avaliarTexto: {
-    fontSize: "14px",
-    color: "#94a3b8",
-    marginBottom: "14px",
-  },
-
-  estrelas: {
-    fontSize: "34px",
-    letterSpacing: "6px",
-    cursor: "pointer",
-  },
-
-  estrela: {
-    color: "#facc15",
-    transition: "transform 0.25s ease",
-  },
-
-  msg: {
-    marginTop: "12px",
-    color: "#38bdf8",
-    fontSize: "14px",
-  },
-};

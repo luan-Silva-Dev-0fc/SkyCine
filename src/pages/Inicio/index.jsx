@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { initializeApp, getApps, getApp } from "firebase/app";
@@ -25,7 +27,10 @@ export default function Home() {
   useEffect(() => {
     async function carregarDados() {
       const filmesSnap = await getDocs(collection(db, "filmes"));
-      setFilmes(filmesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      const filmesData = filmesSnap.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() }))
+        .sort((a, b) => b.dataPublicacao?.seconds - a.dataPublicacao?.seconds);
+      setFilmes(filmesData);
 
       const destaquesSnap = await getDocs(collection(db, "cdstack"));
       setDestaques(destaquesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
@@ -35,60 +40,123 @@ export default function Home() {
   }, []);
 
   return (
-    <div style={styles.container}>
-      <header style={styles.header}>
-        <img
-          src="https://cdn-icons-png.flaticon.com/512/8024/8024270.png"
-          style={styles.menuIcon}
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white font-sans relative">
+      <header className="sticky top-0 z-50 flex items-center justify-between px-4 sm:px-6 py-4 bg-black/70 backdrop-blur-md border-b border-white/5">
+        <h1 className="text-xl font-bold tracking-wide">SkyCine</h1>
+        <button
+          className="flex flex-col gap-1 w-7 h-7 justify-center items-center"
           onClick={() => setMenuOpen(true)}
-        />
-        <h1 style={styles.title}>SkyCine</h1>
+        >
+          <span className="block w-full h-0.5 bg-white rounded"></span>
+          <span className="block w-full h-0.5 bg-white rounded"></span>
+          <span className="block w-full h-0.5 bg-white rounded"></span>
+        </button>
       </header>
 
-      {menuOpen && (
-        <div style={styles.overlay} onClick={() => setMenuOpen(false)}>
-          <aside style={styles.menu} onClick={(e) => e.stopPropagation()}>
-            <button style={styles.menuButton} onClick={() => router.push("/series")}>Séries</button>
-            <button style={styles.menuButton} onClick={() => router.push("/comedia")}>Comédia</button>
-            <button style={styles.menuButton} onClick={() => router.push("/terror")}>Terror</button>
-            <button style={styles.menuButton} onClick={() => router.push("/acao")}>Ação</button>
-            <button style={styles.menuButton} onClick={() => router.push("/animes")}>Animes</button>
-            <button style={styles.menuButton} onClick={() => router.push("/iptv")}>IPTV</button>
-            <button style={styles.menuButton} onClick={() => router.push("/mais-opcoes")}>Mais opções</button>
-            <button style={styles.menuButton} onClick={() => router.push("/configuracoes")}>Configurações</button>
-            
-          </aside>
-        </div>
-      )}
+      <div
+        className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity duration-300 ${
+          menuOpen ? "opacity-100 visible" : "opacity-0 invisible"
+        }`}
+        onClick={() => setMenuOpen(false)}
+      />
 
-      <main style={styles.grid}>
-        {filmes.map((filme) => (
-          <div key={filme.id} style={styles.card}>
-            <img src={filme.capa} style={styles.capa} />
-            <div style={styles.filmeTitulo}>{filme.titulo}</div>
+      <aside
+        className={`fixed top-0 left-0 w-4/5 sm:w-72 h-full bg-gradient-to-b from-gray-800 to-gray-900 p-6 flex flex-col gap-4 z-50 transform transition-transform duration-300 ${
+          menuOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <button
+          className="self-end mb-4 text-white text-2xl font-bold"
+          onClick={() => setMenuOpen(false)}
+        >
+          ×
+        </button>
+        {[
+          { label: "Séries", path: "/series" },
+          { label: "Comédia", path: "/comedia" },
+          { label: "Terror", path: "/terror" },
+          { label: "Ação", path: "/acao" },
+          { label: "Animes", path: "/animes" },
+          { label: "IPTV", path: "/iptv" },
+          { label: "Mais opções", path: "/mais-opcoes" },
+          { label: "Configurações", path: "/configuracoes" },
+        ].map((item) => (
+          <button
+            key={item.path}
+            className="px-4 py-3 bg-white/5 rounded-lg hover:bg-red-600/70 transition-colors font-medium text-sm sm:text-base"
+            onClick={() => {
+              router.push(item.path);
+              setMenuOpen(false);
+            }}
+          >
+            {item.label}
+          </button>
+        ))}
+      </aside>
+
+      <section className="py-6 px-4 sm:px-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4 flex-wrap">
+          <h2 className="text-2xl font-bold">Destaques</h2>
+          <div className="flex flex-wrap gap-3">
             <button
-              style={styles.assistir}
-              onClick={() => router.push(`/idfilmes?id=${filme.id}`)}
+              className="px-3 py-2 bg-gray-700 text-white rounded-lg shadow-sm hover:bg-gray-600 transition-colors text-sm"
+              onClick={() => router.push("/feedback")}
             >
-              Assistir
+              Feedback
+            </button>
+            <button
+              className="px-3 py-2 bg-gray-700 text-white rounded-lg shadow-sm hover:bg-gray-600 transition-colors text-sm"
+              onClick={() => router.push("/elogios")}
+            >
+              Elogios
+            </button>
+            <button
+              className="px-3 py-2 bg-gray-700 text-white rounded-lg shadow-sm hover:bg-gray-600 transition-colors text-sm"
+              onClick={() => router.push("/reclamacoes")}
+            >
+              Reclamações
             </button>
           </div>
-        ))}
-      </main>
-
-      <section style={styles.destaquesSection}>
-        <h2 style={styles.destaquesTitulo}>Veja nossos destaques</h2>
-        <div style={styles.destaquesGrid}>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
           {destaques.map((item) => (
-            <div key={item.id} style={styles.card}>
-              <img src={item.capa} style={styles.capa} />
-              <div style={styles.filmeTitulo}>{item.titulo}</div>
-              <button
-                style={styles.assistir}
-                onClick={() => router.push(`/id.destaques?id=${item.id}`)}
-              >
-                Assistir
-              </button>
+            <div
+              key={item.id}
+              className="bg-white/5 rounded-xl overflow-hidden shadow-lg hover:scale-105 transition-transform"
+            >
+              <img src={item.capa} className="w-full aspect-[2/3] object-cover" />
+              <div className="p-4">
+                <div className="font-medium text-center mb-3 text-sm sm:text-base">{item.titulo}</div>
+                <button
+                  className="w-full py-2 bg-red-600 rounded-lg font-bold hover:bg-red-700 transition-colors text-sm sm:text-base"
+                  onClick={() => router.push(`/id.destaques?id=${item.id}`)}
+                >
+                  Assistir
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="py-6 px-4 sm:px-6 border-t border-white/5">
+        <h2 className="text-2xl font-bold mb-6">Filmes Recentes</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6">
+          {filmes.map((filme) => (
+            <div
+              key={filme.id}
+              className="bg-white/5 rounded-xl overflow-hidden shadow-lg hover:scale-105 transition-transform"
+            >
+              <img src={filme.capa} className="w-full aspect-[2/3] object-cover" />
+              <div className="p-3">
+                <div className="font-medium text-sm text-center mb-2">{filme.titulo}</div>
+                <button
+                  className="w-full py-1 bg-red-600 rounded-lg font-bold hover:bg-red-700 transition-colors text-sm"
+                  onClick={() => router.push(`/idfilmes?id=${filme.id}`)}
+                >
+                  Assistir
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -96,141 +164,3 @@ export default function Home() {
     </div>
   );
 }
-
-const styles = {
-  container: {
-    minHeight: "100vh",
-    background: "linear-gradient(180deg, #050505, #0a0a0a)",
-    color: "#fff",
-    fontFamily: "system-ui, -apple-system, BlinkMacSystemFont",
-  },
-
-header: {
-  position: "sticky",
-  top: 0,
-  zIndex: 20,
-  display: "flex",
-  alignItems: "center",
-  padding: "18px 24px",
-  backdropFilter: "blur(10px)",
-  background: "rgba(5,5,5,0.7)",
-  borderBottom: "1px solid rgba(255,255,255,0.05)",
-  position: "relative",
-},
-
-
-  menuIcon: {
-    width: "28px",
-    cursor: "pointer",
-    filter: "invert(1)",
-    transition: "transform .2s ease",
-  },
-
-  title: {
-  position: "absolute",
-  left: "50%",
-  transform: "translateX(-50%)",
-  fontSize: "20px",
-  fontWeight: "700",
-  letterSpacing: "0.5px",
-  pointerEvents: "none", // evita atrapalhar o clique no menu
-},
-
-
-  overlay: {
-    position: "fixed",
-    inset: 0,
-    background: "rgba(0,0,0,0.6)",
-    backdropFilter: "blur(4px)",
-    zIndex: 30,
-  },
-
-  menu: {
-    width: "270px",
-    height: "100%",
-    background: "linear-gradient(180deg, #0c0c0c, #111)",
-    padding: "24px",
-    display: "flex",
-    flexDirection: "column",
-    gap: "14px",
-    boxShadow: "10px 0 40px rgba(0,0,0,.6)",
-    animation: "slideIn .25s ease",
-  },
-
-  menuButton: {
-    padding: "14px",
-    background: "rgba(255,255,255,0.04)",
-    border: "1px solid rgba(255,255,255,0.08)",
-    borderRadius: "12px",
-    color: "#fff",
-    cursor: "pointer",
-    fontSize: "15px",
-    transition: "all .2s ease",
-  },
-
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
-    gap: "26px",
-    padding: "30px",
-  },
-
-  card: {
-    position: "relative",
-    background: "rgba(255,255,255,0.03)",
-    borderRadius: "18px",
-    padding: "10px",
-    overflow: "hidden",
-    transition: "transform .25s ease, box-shadow .25s ease",
-    boxShadow: "0 10px 30px rgba(0,0,0,.4)",
-  },
-
-  capa: {
-    width: "100%",
-    borderRadius: "14px",
-    aspectRatio: "2/3",
-    objectFit: "cover",
-  },
-
-  filmeTitulo: {
-    margin: "14px 0 10px",
-    fontSize: "14px",
-    textAlign: "center",
-    fontWeight: "500",
-    lineHeight: "1.3",
-    display: "-webkit-box",
-    WebkitLineClamp: 2,
-    WebkitBoxOrient: "vertical",
-    overflow: "hidden",
-  },
-
-  assistir: {
-    width: "100%",
-    padding: "12px",
-    background: "linear-gradient(135deg, #e50914, #b20710)",
-    border: "none",
-    borderRadius: "12px",
-    color: "#fff",
-    cursor: "pointer",
-    fontWeight: "700",
-    letterSpacing: "0.3px",
-    transition: "transform .2s ease, filter .2s ease",
-  },
-
-  destaquesSection: {
-    padding: "50px 30px",
-    borderTop: "1px solid rgba(255,255,255,0.06)",
-  },
-
-  destaquesTitulo: {
-    marginBottom: "24px",
-    fontSize: "22px",
-    fontWeight: "700",
-  },
-
-  destaquesGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-    gap: "26px",
-  },
-};
