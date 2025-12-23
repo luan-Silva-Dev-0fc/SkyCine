@@ -55,4 +55,12 @@ const withPWA = require('next-pwa')({
 
 module.exports = withPWA({
   reactStrictMode: true,
+
+  // ✅ Desativa Turbopack e força Webpack
+  turbopack: false,
+
+  webpack: (config, { isServer }) => {
+    // Aqui você pode manter suas customizações do webpack se houver
+    return config;
+  },
 });
