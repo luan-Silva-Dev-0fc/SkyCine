@@ -104,18 +104,7 @@ export default function Home() {
             >
               Feedback
             </button>
-            <button
-              className="px-3 py-2 bg-gray-700 text-white rounded-lg shadow-sm hover:bg-gray-600 transition-colors text-sm"
-              onClick={() => router.push("/elogios")}
-            >
-              Elogios
-            </button>
-            <button
-              className="px-3 py-2 bg-gray-700 text-white rounded-lg shadow-sm hover:bg-gray-600 transition-colors text-sm"
-              onClick={() => router.push("/reclamacoes")}
-            >
-              Reclamações
-            </button>
+           
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
