@@ -9,25 +9,32 @@ export default function IPTV() {
   ];
 
   return (
-    <div style={styles.container}>
-      <header style={styles.header}>
-        <h1 style={styles.title}>SkyCine IPTV</h1>
+    <div className="min-h-screen bg-black text-white font-sans p-6 md:p-12">
+      <header className="text-center mb-12">
+        <h1 className="text-4xl md:text-5xl font-extrabold bg-gradient-to-r from-purple-700 to-pink-400 bg-clip-text text-transparent">
+          SkyCine IPTV
+        </h1>
       </header>
 
-      <div style={styles.grid}>
+      <div className="grid gap-6 md:gap-8 justify-center grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
         {players.map((p) => (
-          <div key={p.canal} style={styles.card}>
-            <h2 style={styles.canalNome}>{p.nome}</h2>
+          <div
+            key={p.canal}
+            className="bg-gray-900 rounded-xl p-6 shadow-[0_10px_30px_rgba(140,44,226,0.4)] text-center"
+          >
+            <h2 className="text-xl md:text-2xl font-semibold mb-4 text-pink-400">
+              {p.nome}
+            </h2>
             <iframe
               name="Player"
               src={`//%72%65%64%65%63%61%6E%61%69%73%74%76%2E%66%6D/player3/ch.php?canal=${p.canal}`}
               frameBorder="0"
               height="400"
-              width="640"
+              width="100%"
               scrolling="no"
               allow="encrypted-media"
               allowFullScreen
-              style={styles.iframe}
+              className="rounded-lg"
             ></iframe>
           </div>
         ))}
@@ -35,47 +42,3 @@ export default function IPTV() {
     </div>
   );
 }
-
-const styles = {
-  container: {
-    minHeight: "100vh",
-    background: "#050505",
-    color: "#fff",
-    fontFamily: "sans-serif",
-    padding: "20px",
-  },
-  header: {
-    textAlign: "center",
-    marginBottom: "40px",
-  },
-  title: {
-    fontSize: "32px",
-    fontWeight: "700",
-    background: "linear-gradient(90deg, #8b2ce2, #d27eff)",
-    WebkitBackgroundClip: "text",
-    WebkitTextFillColor: "transparent",
-  },
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(680px, 1fr))",
-    gap: "24px",
-    justifyContent: "center",
-  },
-  card: {
-    background: "#0c0c0c",
-    borderRadius: "16px",
-    padding: "16px",
-    boxShadow: "0 10px 30px rgba(140, 44, 226, 0.4)",
-    textAlign: "center",
-  },
-  canalNome: {
-    fontSize: "20px",
-    fontWeight: "600",
-    marginBottom: "12px",
-    color: "#d27eff",
-  },
-  iframe: {
-    borderRadius: "12px",
-    maxWidth: "100%",
-  },
-};
