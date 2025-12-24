@@ -26,14 +26,19 @@ export default function Home() {
 
   useEffect(() => {
     async function carregarDados() {
+      // FILMES
       const filmesSnap = await getDocs(collection(db, "filmes"));
       const filmesData = filmesSnap.docs
         .map((doc) => ({ id: doc.id, ...doc.data() }))
-        .sort((a, b) => b.dataPublicacao?.seconds - a.dataPublicacao?.seconds);
+        .reverse(); // garante que os últimos adicionados fiquem na frente
       setFilmes(filmesData);
 
+      // DESTAQUES
       const destaquesSnap = await getDocs(collection(db, "cdstack"));
-      setDestaques(destaquesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      const destaquesData = destaquesSnap.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() }))
+        .reverse(); // últimos adicionados primeiro
+      setDestaques(destaquesData);
     }
 
     carregarDados();
@@ -104,7 +109,6 @@ export default function Home() {
             >
               Feedback
             </button>
-           
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
