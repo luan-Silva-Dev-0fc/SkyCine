@@ -24,38 +24,94 @@ export default function Home() {
   const [filmes, setFilmes] = useState([]);
   const [destaques, setDestaques] = useState([]);
   const [series, setSeries] = useState([]);
+  const [heroIndex, setHeroIndex] = useState(0);
 
   useEffect(() => {
     async function carregarDados() {
-      const filmesSnap = await getDocs(collection(db, "filmes"));
-      const filmesData = filmesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })).reverse();
-      setFilmes(filmesData);
+      try {
+        const filmesSnap = await getDocs(collection(db, "filmes"));
+        const filmesData = filmesSnap.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .reverse()
+          .filter(f => f.capa && f.titulo);
+        setFilmes(filmesData);
 
-      const destaquesSnap = await getDocs(collection(db, "cdstack"));
-      const destaquesData = destaquesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })).reverse();
-      setDestaques(destaquesData);
+        const destaquesSnap = await getDocs(collection(db, "cdstack"));
+        const destaquesData = destaquesSnap.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .reverse()
+          .filter(d => d.capa && d.titulo && (d.video || d.url || d.link));
+        setDestaques(destaquesData);
 
-      const seriesSnap = await getDocs(collection(db, "conteudos"));
-      const seriesData = seriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })).reverse();
-      setSeries(seriesData);
+        const seriesSnap = await getDocs(collection(db, "conteudos"));
+        const seriesData = seriesSnap.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .reverse()
+          .filter(s => s.capa && s.titulo);
+        setSeries(seriesData);
+      } catch (err) {
+        console.error("Erro ao carregar dados:", err);
+      }
     }
 
     carregarDados();
   }, []);
 
+  const hero = destaques[heroIndex % (destaques.length || 1)];
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white font-sans relative">
-      <header className="sticky top-0 z-50 flex items-center justify-between px-4 sm:px-6 py-4 bg-black/70 backdrop-blur-md border-b border-white/5">
-        <h1 className="text-xl font-bold tracking-wide">SkyCine</h1>
-        <button
-          className="flex flex-col gap-1 w-7 h-7 justify-center items-center"
-          onClick={() => setMenuOpen(true)}
-        >
-          <span className="block w-full h-0.5 bg-white rounded"></span>
-          <span className="block w-full h-0.5 bg-white rounded"></span>
-          <span className="block w-full h-0.5 bg-white rounded"></span>
-        </button>
-      </header>
+
+      {hero && (
+        <section className="relative h-[75vh] w-full overflow-hidden">
+          <video
+            key={hero.id}
+            src={hero.video || hero.url || hero.link}
+            autoPlay
+            muted
+            loop
+            playsInline
+            poster={hero.capa}
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
+
+          <div className="absolute top-6 left-6 z-30">
+            <button
+              className="flex flex-col gap-1 w-8 h-8 justify-center items-center"
+              onClick={() => setMenuOpen(true)}
+            >
+              <span className="w-full h-0.5 bg-white"></span>
+              <span className="w-full h-0.5 bg-white"></span>
+              <span className="w-full h-0.5 bg-white"></span>
+            </button>
+          </div>
+
+          <div className="absolute top-6 left-1/2 -translate-x-1/2 z-30">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-wide">SkyCine</h1>
+          </div>
+
+          <div className="relative z-20 h-full flex flex-col justify-end px-6 pb-10 max-w-3xl">
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4">{hero.titulo}</h2>
+
+            <div className="flex gap-3">
+              <button
+                className="px-6 py-3 bg-red-600 rounded-lg font-bold hover:bg-red-700 transition"
+                onClick={() => router.push(`/id.destaques?id=${hero.id}`)}
+              >
+                Assistir agora
+              </button>
+
+              <button
+                className="px-6 py-3 bg-white/10 rounded-lg font-bold hover:bg-white/20 transition"
+                onClick={() => setHeroIndex(i => i + 1)}
+              >
+                Ver próximo
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
 
       <div
         className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity duration-300 ${
@@ -75,10 +131,20 @@ export default function Home() {
         >
           ×
         </button>
+
+        <button
+          className="px-4 py-3 bg-white/5 rounded-lg hover:bg-red-600/70 transition-colors font-medium"
+          onClick={() => {
+            router.push("/feedback");
+            setMenuOpen(false);
+          }}
+        >
+          Feedback
+        </button>
+
         {[
           { label: "Séries", path: "/series" },
           { label: "Comédia", path: "/comedia" },
-          { label: "Feedback", path: "/feedback" },
           { label: "Terror", path: "/terror" },
           { label: "Ação", path: "/acao" },
           { label: "Animes", path: "/animes" },
@@ -88,7 +154,7 @@ export default function Home() {
         ].map(item => (
           <button
             key={item.path}
-            className="px-4 py-3 bg-white/5 rounded-lg hover:bg-red-600/70 transition-colors font-medium text-sm sm:text-base"
+            className="px-4 py-3 bg-white/5 rounded-lg hover:bg-red-600/70 transition-colors font-medium"
             onClick={() => {
               router.push(item.path);
               setMenuOpen(false);
@@ -100,70 +166,64 @@ export default function Home() {
       </aside>
 
       <section className="py-6 px-4 sm:px-6">
-  <h2 className="text-xl sm:text-2xl font-bold mb-6">Destaques</h2>
-  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4">
-    {destaques.map(item => (
-      <div key={item.id} className="bg-white/5 rounded-xl overflow-hidden shadow-lg hover:scale-105 transition-transform">
-        <img
-          src={item.capa}
-          className="w-full aspect-[2/3] object-cover sm:aspect-[2/3] md:aspect-[2/3]"
-        />
-        <div className="p-2 sm:p-4">
-          <div className="font-medium text-center text-xs sm:text-sm mb-2 sm:mb-3">{item.titulo}</div>
-          <button
-            className="w-full py-1 sm:py-2 bg-red-600 rounded-lg font-bold hover:bg-red-700 transition-colors text-xs sm:text-sm"
-            onClick={() => router.push(`/id.destaques?id=${item.id}`)}
-          >
-            Assistir
-          </button>
+        <h2 className="text-xl sm:text-2xl font-bold mb-6">Destaques</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4">
+          {destaques.map(item => (
+            <div key={item.id} className="bg-white/5 rounded-xl overflow-hidden shadow-lg hover:scale-105 transition-transform">
+              <img src={item.capa} className="w-full aspect-[2/3] object-cover" />
+              <div className="p-2 sm:p-4">
+                <div className="font-medium text-center text-xs sm:text-sm mb-2">{item.titulo}</div>
+                <button
+                  className="w-full py-2 bg-red-600 rounded-lg font-bold hover:bg-red-700"
+                  onClick={() => router.push(`/id.destaques?id=${item.id}`)}
+                >
+                  Assistir
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
-      </div>
-    ))}
-  </div>
-</section>
+      </section>
 
-<section className="py-6 px-4 sm:px-6 border-t border-white/5">
-  <h2 className="text-xl sm:text-2xl font-bold mb-6">Séries</h2>
-  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4">
-    {series.map(serie => (
-      <div key={serie.id} className="bg-white/5 rounded-xl overflow-hidden shadow-lg hover:scale-105 transition-transform">
-        <img
-          src={serie.capa}
-          className="w-full aspect-[2/3] object-cover"
-        />
-        <div className="p-2 sm:p-3">
-          <div className="font-medium text-xs sm:text-sm text-center mb-1 sm:mb-2">{serie.titulo}</div>
-          <button
-            className="w-full py-1 sm:py-1.5 bg-red-600 rounded-lg font-bold hover:bg-red-700 transition-colors text-xs sm:text-sm"
-            onClick={() => router.push(`/id.series?id=${serie.id}`)}
-          >
-            Assistir
-          </button>
+      <section className="py-6 px-4 sm:px-6 border-t border-white/5">
+        <h2 className="text-xl sm:text-2xl font-bold mb-6">Séries</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4">
+          {series.map(serie => (
+            <div key={serie.id} className="bg-white/5 rounded-xl overflow-hidden shadow-lg hover:scale-105 transition-transform">
+              <img src={serie.capa} className="w-full aspect-[2/3] object-cover" />
+              <div className="p-2 sm:p-3">
+                <div className="font-medium text-xs sm:text-sm text-center mb-2">{serie.titulo}</div>
+                <button
+                  className="w-full py-1.5 bg-red-600 rounded-lg font-bold hover:bg-red-700"
+                  onClick={() => router.push(`/id.series?id=${serie.id}`)}
+                >
+                  Assistir
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
-      </div>
-    ))}
-  </div>
-</section>
+      </section>
 
-<section className="py-6 px-4 sm:px-6 border-t border-white/5">
-  <h2 className="text-xl sm:text-2xl font-bold mb-6">Filmes Recentes</h2>
-  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4">
-    {filmes.map(filme => (
-      <div key={filme.id} className="bg-white/5 rounded-xl overflow-hidden shadow-lg hover:scale-105 transition-transform">
-        <img src={filme.capa} className="w-full aspect-[2/3] object-cover" />
-        <div className="p-2 sm:p-3">
-          <div className="font-medium text-xs sm:text-sm text-center mb-1 sm:mb-2">{filme.titulo}</div>
-          <button
-            className="w-full py-1 sm:py-1.5 bg-red-600 rounded-lg font-bold hover:bg-red-700 transition-colors text-xs sm:text-sm"
-            onClick={() => router.push(`/idfilmes?id=${filme.id}`)}
-          >
-            Assistir
-          </button>
+      <section className="py-6 px-4 sm:px-6 border-t border-white/5">
+        <h2 className="text-xl sm:text-2xl font-bold mb-6">Filmes Recentes</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4">
+          {filmes.map(filme => (
+            <div key={filme.id} className="bg-white/5 rounded-xl overflow-hidden shadow-lg hover:scale-105 transition-transform">
+              <img src={filme.capa} className="w-full aspect-[2/3] object-cover" />
+              <div className="p-2 sm:p-3">
+                <div className="font-medium text-xs sm:text-sm text-center mb-2">{filme.titulo}</div>
+                <button
+                  className="w-full py-1.5 bg-red-600 rounded-lg font-bold hover:bg-red-700"
+                  onClick={() => router.push(`/idfilmes?id=${filme.id}`)}
+                >
+                  Assistir
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
-      </div>
-    ))}
-  </div>
-</section>
+      </section>
 
     </div>
   );

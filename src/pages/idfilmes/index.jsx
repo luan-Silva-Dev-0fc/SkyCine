@@ -23,6 +23,8 @@ export default function Assistir() {
   const [filme, setFilme] = useState(null);
   const [media, setMedia] = useState("0.0");
   const [playing, setPlaying] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [savedTime, setSavedTime] = useState(0);
   const videoRef = useRef(null);
 
   useEffect(() => {
@@ -45,6 +47,43 @@ export default function Assistir() {
     carregar();
   }, [db]);
 
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !filme) return;
+
+    const id = new URLSearchParams(window.location.search).get("id");
+    const tempoSalvo = localStorage.getItem(`video-${id}`);
+    if (tempoSalvo) {
+      setSavedTime(parseFloat(tempoSalvo));
+      setModalOpen(true);
+    }
+
+    const salvarProgresso = () => {
+      localStorage.setItem(`video-${id}`, video.currentTime.toString());
+    };
+
+    video.addEventListener("pause", salvarProgresso);
+    window.addEventListener("beforeunload", salvarProgresso);
+
+    return () => {
+      video.removeEventListener("pause", salvarProgresso);
+      window.removeEventListener("beforeunload", salvarProgresso);
+    };
+  }, [filme]);
+
+  const continuarVideo = () => {
+    videoRef.current.currentTime = savedTime;
+    videoRef.current.play();
+    setPlaying(true);
+    setModalOpen(false);
+  };
+
+  const começarDoInicio = () => {
+    videoRef.current.play();
+    setPlaying(true);
+    setModalOpen(false);
+  };
+
   if (!filme) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-black text-white">
@@ -54,31 +93,51 @@ export default function Assistir() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      {/* HERO */}
+    <div className="min-h-screen bg-black text-white relative">
+      {modalOpen && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50">
+          <div className="bg-gray-800 rounded-xl shadow-xl p-6 max-w-sm text-center">
+            <h2 className="text-red-600 font-bold text-lg mb-4">
+              Continuar de onde parou?
+            </h2>
+            <p className="text-gray-300 mb-6">
+              Você parou em {Math.floor(savedTime / 60)}:
+              {Math.floor(savedTime % 60).toString().padStart(2, "0")}
+            </p>
+            <div className="flex justify-center gap-4">
+              <button
+                onClick={continuarVideo}
+                className="px-4 py-2 bg-red-600 rounded-lg font-semibold hover:bg-red-700"
+              >
+                Continuar
+              </button>
+              <button
+                onClick={começarDoInicio}
+                className="px-4 py-2 bg-gray-600 rounded-lg font-semibold hover:bg-gray-500"
+              >
+                Começar do Início
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <section className="relative w-full">
-        {/* FUNDO */}
         <div
           className="absolute inset-0 bg-cover bg-center blur-2xl scale-110"
           style={{ backgroundImage: `url(${filme.capa})` }}
         />
         <div className="absolute inset-0 bg-black/70" />
-
-        {/* CONTEÚDO */}
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 pt-8 sm:pt-10 pb-6">
-          {/* TÍTULO */}
           <h1
             className="font-bold text-red-600 leading-tight"
             style={{ fontSize: "clamp(1.5rem, 4vw, 2.5rem)" }}
           >
             {filme.titulo}
           </h1>
-
           <p className="text-gray-300 text-sm sm:text-base mt-1">
             Avaliação média {media}
           </p>
-
-          {/* PLAYER */}
           <div className="relative mt-4 sm:mt-6">
             <video
               ref={videoRef}
@@ -96,7 +155,6 @@ export default function Assistir() {
                 lg:max-h-[70vh]
               "
             />
-
             {!playing && (
               <button
                 onClick={() => {
@@ -122,7 +180,6 @@ export default function Assistir() {
         </div>
       </section>
 
-      {/* DETALHES */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
         <div className="flex flex-col sm:flex-row gap-6 sm:gap-8">
           <img
@@ -139,19 +196,14 @@ export default function Assistir() {
               shadow-xl
             "
           />
-
           <div className="flex-1">
             <div className="flex flex-wrap gap-2 mb-3 text-xs sm:text-sm text-gray-300">
               <span className="px-3 py-1 rounded-full bg-white/10">HD</span>
               <span className="px-3 py-1 rounded-full bg-white/10">Online</span>
-              <span className="px-3 py-1 rounded-full bg-white/10">
-                Streaming
-              </span>
+              <span className="px-3 py-1 rounded-full bg-white/10">Streaming</span>
             </div>
-
             <p className="text-gray-300 text-sm sm:text-base leading-relaxed max-w-3xl">
-              {filme.descricao ||
-                "Assista com qualidade máxima e reprodução fluida."}
+              {filme.descricao || "Assista com qualidade máxima e reprodução fluida."}
             </p>
           </div>
         </div>

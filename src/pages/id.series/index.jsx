@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore, collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
@@ -8,6 +8,7 @@ import { getFirestore, collection, query, where, getDocs, doc, getDoc } from "fi
 export default function Serie() {
   const router = useRouter();
   const { id } = router.query;
+  const videoRef = useRef(null);
 
   const firebaseConfig = {
     apiKey: "AIzaSyDz6mdcZQ_Z3815u50nJCjqy4GEOyndn5k",
@@ -28,6 +29,9 @@ export default function Serie() {
   const [videoAtual, setVideoAtual] = useState("");
   const [temporadas, setTemporadas] = useState([]);
   const [temporadaSelecionada, setTemporadaSelecionada] = useState(null);
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [savedTime, setSavedTime] = useState(0);
 
   useEffect(() => {
     if (!id) return;
@@ -62,6 +66,40 @@ export default function Serie() {
     carregarSerie();
   }, [id]);
 
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !videoAtual) return;
+
+    const saved = localStorage.getItem(`video-${videoAtual}`);
+    if (saved) {
+      setSavedTime(parseFloat(saved));
+      setModalOpen(true);
+    }
+
+    const salvarProgresso = () => {
+      localStorage.setItem(`video-${videoAtual}`, video.currentTime.toString());
+    };
+
+    video.addEventListener("pause", salvarProgresso);
+    window.addEventListener("beforeunload", salvarProgresso);
+
+    return () => {
+      video.removeEventListener("pause", salvarProgresso);
+      window.removeEventListener("beforeunload", salvarProgresso);
+    };
+  }, [videoAtual]);
+
+  const continuarVideo = () => {
+    videoRef.current.currentTime = savedTime;
+    videoRef.current.play();
+    setModalOpen(false);
+  };
+
+  const começarDoInicio = () => {
+    videoRef.current.play();
+    setModalOpen(false);
+  };
+
   const trocarTemporada = (temp) => {
     setTemporadaSelecionada(temp);
     setTitulo(temp.titulo + " - Temporada " + temp.temporada);
@@ -75,6 +113,34 @@ export default function Serie() {
 
   return (
     <div className="min-h-screen text-white bg-black relative">
+      {modalOpen && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50">
+          <div className="bg-gray-800 rounded-xl shadow-xl p-6 max-w-sm text-center">
+            <h2 className="text-red-600 font-bold text-lg mb-4">
+              Continuar de onde parou?
+            </h2>
+            <p className="text-gray-300 mb-6">
+              Você parou em {Math.floor(savedTime / 60)}:
+              {Math.floor(savedTime % 60).toString().padStart(2, "0")}
+            </p>
+            <div className="flex justify-center gap-4">
+              <button
+                onClick={continuarVideo}
+                className="px-4 py-2 bg-red-600 rounded-lg font-semibold hover:bg-red-700"
+              >
+                Continuar
+              </button>
+              <button
+                onClick={começarDoInicio}
+                className="px-4 py-2 bg-gray-600 rounded-lg font-semibold hover:bg-gray-500"
+              >
+                Começar do Início
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div
         className="absolute inset-0 bg-cover bg-center blur-sm scale-105"
         style={{ backgroundImage: `url(${capa})` }}
@@ -110,6 +176,7 @@ export default function Serie() {
         <div className="w-full bg-black rounded-xl overflow-hidden shadow-2xl mb-10 relative">
           {videoAtual && (
             <video
+              ref={videoRef}
               src={videoAtual}
               controls
               autoPlay
