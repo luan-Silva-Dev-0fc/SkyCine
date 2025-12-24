@@ -78,6 +78,7 @@ export default function Home() {
         {[
           { label: "Séries", path: "/series" },
           { label: "Comédia", path: "/comedia" },
+          { label: "Feedback", path: "/feedback" },
           { label: "Terror", path: "/terror" },
           { label: "Ação", path: "/acao" },
           { label: "Animes", path: "/animes" },
@@ -99,43 +100,41 @@ export default function Home() {
       </aside>
 
       <section className="py-6 px-4 sm:px-6">
-        <h2 className="text-2xl font-bold mb-6">Destaques</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-          {destaques.map(item => (
-            <div key={item.id} className="bg-white/5 rounded-xl overflow-hidden shadow-lg hover:scale-105 transition-transform">
-              <img src={item.capa} className="w-full aspect-[2/3] object-cover" />
-              <div className="p-4">
-                <div className="font-medium text-center mb-3">{item.titulo}</div>
-                <button
-                  className="w-full py-2 bg-red-600 rounded-lg font-bold hover:bg-red-700 transition-colors"
-                  onClick={() => router.push(`/id.destaques?id=${item.id}`)}
-                >
-                  Assistir
-                </button>
-              </div>
-            </div>
-          ))}
+  <h2 className="text-xl sm:text-2xl font-bold mb-6">Destaques</h2>
+  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4">
+    {destaques.map(item => (
+      <div key={item.id} className="bg-white/5 rounded-xl overflow-hidden shadow-lg hover:scale-105 transition-transform">
+        <img
+          src={item.capa}
+          className="w-full aspect-[2/3] object-cover sm:aspect-[2/3] md:aspect-[2/3]"
+        />
+        <div className="p-2 sm:p-4">
+          <div className="font-medium text-center text-xs sm:text-sm mb-2 sm:mb-3">{item.titulo}</div>
+          <button
+            className="w-full py-1 sm:py-2 bg-red-600 rounded-lg font-bold hover:bg-red-700 transition-colors text-xs sm:text-sm"
+            onClick={() => router.push(`/id.destaques?id=${item.id}`)}
+          >
+            Assistir
+          </button>
         </div>
-      </section>
+      </div>
+    ))}
+  </div>
+</section>
 
-      <section className="py-6 px-4 sm:px-6 border-t border-white/5">
-  <h2 className="text-2xl font-bold mb-6">Séries</h2>
-  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6">
+<section className="py-6 px-4 sm:px-6 border-t border-white/5">
+  <h2 className="text-xl sm:text-2xl font-bold mb-6">Séries</h2>
+  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4">
     {series.map(serie => (
-      <div
-        key={serie.id}
-        className="bg-white/5 rounded-xl overflow-hidden shadow-lg hover:scale-105 transition-transform"
-      >
+      <div key={serie.id} className="bg-white/5 rounded-xl overflow-hidden shadow-lg hover:scale-105 transition-transform">
         <img
           src={serie.capa}
           className="w-full aspect-[2/3] object-cover"
         />
-        <div className="p-3">
-          <div className="font-medium text-sm text-center mb-2">
-            {serie.titulo}
-          </div>
+        <div className="p-2 sm:p-3">
+          <div className="font-medium text-xs sm:text-sm text-center mb-1 sm:mb-2">{serie.titulo}</div>
           <button
-            className="w-full py-1 bg-red-600 rounded-lg font-bold hover:bg-red-700 transition-colors text-sm"
+            className="w-full py-1 sm:py-1.5 bg-red-600 rounded-lg font-bold hover:bg-red-700 transition-colors text-xs sm:text-sm"
             onClick={() => router.push(`/id.series?id=${serie.id}`)}
           >
             Assistir
@@ -146,26 +145,26 @@ export default function Home() {
   </div>
 </section>
 
-
-      <section className="py-6 px-4 sm:px-6 border-t border-white/5">
-        <h2 className="text-2xl font-bold mb-6">Filmes Recentes</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6">
-          {filmes.map(filme => (
-            <div key={filme.id} className="bg-white/5 rounded-xl overflow-hidden shadow-lg hover:scale-105 transition-transform">
-              <img src={filme.capa} className="w-full aspect-[2/3] object-cover" />
-              <div className="p-3">
-                <div className="font-medium text-sm text-center mb-2">{filme.titulo}</div>
-                <button
-                  className="w-full py-1 bg-red-600 rounded-lg font-bold hover:bg-red-700 transition-colors text-sm"
-                  onClick={() => router.push(`/idfilmes?id=${filme.id}`)}
-                >
-                  Assistir
-                </button>
-              </div>
-            </div>
-          ))}
+<section className="py-6 px-4 sm:px-6 border-t border-white/5">
+  <h2 className="text-xl sm:text-2xl font-bold mb-6">Filmes Recentes</h2>
+  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4">
+    {filmes.map(filme => (
+      <div key={filme.id} className="bg-white/5 rounded-xl overflow-hidden shadow-lg hover:scale-105 transition-transform">
+        <img src={filme.capa} className="w-full aspect-[2/3] object-cover" />
+        <div className="p-2 sm:p-3">
+          <div className="font-medium text-xs sm:text-sm text-center mb-1 sm:mb-2">{filme.titulo}</div>
+          <button
+            className="w-full py-1 sm:py-1.5 bg-red-600 rounded-lg font-bold hover:bg-red-700 transition-colors text-xs sm:text-sm"
+            onClick={() => router.push(`/idfilmes?id=${filme.id}`)}
+          >
+            Assistir
+          </button>
         </div>
-      </section>
+      </div>
+    ))}
+  </div>
+</section>
+
     </div>
   );
 }
