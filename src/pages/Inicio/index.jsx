@@ -23,22 +23,21 @@ export default function Home() {
 
   const [filmes, setFilmes] = useState([]);
   const [destaques, setDestaques] = useState([]);
+  const [series, setSeries] = useState([]);
 
   useEffect(() => {
     async function carregarDados() {
-      // FILMES
       const filmesSnap = await getDocs(collection(db, "filmes"));
-      const filmesData = filmesSnap.docs
-        .map((doc) => ({ id: doc.id, ...doc.data() }))
-        .reverse(); // garante que os últimos adicionados fiquem na frente
+      const filmesData = filmesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })).reverse();
       setFilmes(filmesData);
 
-      // DESTAQUES
       const destaquesSnap = await getDocs(collection(db, "cdstack"));
-      const destaquesData = destaquesSnap.docs
-        .map((doc) => ({ id: doc.id, ...doc.data() }))
-        .reverse(); // últimos adicionados primeiro
+      const destaquesData = destaquesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })).reverse();
       setDestaques(destaquesData);
+
+      const seriesSnap = await getDocs(collection(db, "conteudos"));
+      const seriesData = seriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })).reverse();
+      setSeries(seriesData);
     }
 
     carregarDados();
@@ -85,7 +84,7 @@ export default function Home() {
           { label: "IPTV", path: "/iptv" },
           { label: "Mais opções", path: "/mais-opcoes" },
           { label: "Configurações", path: "/configuracoes" },
-        ].map((item) => (
+        ].map(item => (
           <button
             key={item.path}
             className="px-4 py-3 bg-white/5 rounded-lg hover:bg-red-600/70 transition-colors font-medium text-sm sm:text-base"
@@ -100,28 +99,15 @@ export default function Home() {
       </aside>
 
       <section className="py-6 px-4 sm:px-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4 flex-wrap">
-          <h2 className="text-2xl font-bold">Destaques</h2>
-          <div className="flex flex-wrap gap-3">
-            <button
-              className="px-3 py-2 bg-gray-700 text-white rounded-lg shadow-sm hover:bg-gray-600 transition-colors text-sm"
-              onClick={() => router.push("/feedback")}
-            >
-              Feedback
-            </button>
-          </div>
-        </div>
+        <h2 className="text-2xl font-bold mb-6">Destaques</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-          {destaques.map((item) => (
-            <div
-              key={item.id}
-              className="bg-white/5 rounded-xl overflow-hidden shadow-lg hover:scale-105 transition-transform"
-            >
+          {destaques.map(item => (
+            <div key={item.id} className="bg-white/5 rounded-xl overflow-hidden shadow-lg hover:scale-105 transition-transform">
               <img src={item.capa} className="w-full aspect-[2/3] object-cover" />
               <div className="p-4">
-                <div className="font-medium text-center mb-3 text-sm sm:text-base">{item.titulo}</div>
+                <div className="font-medium text-center mb-3">{item.titulo}</div>
                 <button
-                  className="w-full py-2 bg-red-600 rounded-lg font-bold hover:bg-red-700 transition-colors text-sm sm:text-base"
+                  className="w-full py-2 bg-red-600 rounded-lg font-bold hover:bg-red-700 transition-colors"
                   onClick={() => router.push(`/id.destaques?id=${item.id}`)}
                 >
                   Assistir
@@ -133,13 +119,39 @@ export default function Home() {
       </section>
 
       <section className="py-6 px-4 sm:px-6 border-t border-white/5">
+  <h2 className="text-2xl font-bold mb-6">Séries</h2>
+  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6">
+    {series.map(serie => (
+      <div
+        key={serie.id}
+        className="bg-white/5 rounded-xl overflow-hidden shadow-lg hover:scale-105 transition-transform"
+      >
+        <img
+          src={serie.capa}
+          className="w-full aspect-[2/3] object-cover"
+        />
+        <div className="p-3">
+          <div className="font-medium text-sm text-center mb-2">
+            {serie.titulo}
+          </div>
+          <button
+            className="w-full py-1 bg-red-600 rounded-lg font-bold hover:bg-red-700 transition-colors text-sm"
+            onClick={() => router.push(`/id.series?id=${serie.id}`)}
+          >
+            Assistir
+          </button>
+        </div>
+      </div>
+    ))}
+  </div>
+</section>
+
+
+      <section className="py-6 px-4 sm:px-6 border-t border-white/5">
         <h2 className="text-2xl font-bold mb-6">Filmes Recentes</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6">
-          {filmes.map((filme) => (
-            <div
-              key={filme.id}
-              className="bg-white/5 rounded-xl overflow-hidden shadow-lg hover:scale-105 transition-transform"
-            >
+          {filmes.map(filme => (
+            <div key={filme.id} className="bg-white/5 rounded-xl overflow-hidden shadow-lg hover:scale-105 transition-transform">
               <img src={filme.capa} className="w-full aspect-[2/3] object-cover" />
               <div className="p-3">
                 <div className="font-medium text-sm text-center mb-2">{filme.titulo}</div>
