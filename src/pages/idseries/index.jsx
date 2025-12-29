@@ -3,10 +3,10 @@
 import { useEffect, useState, useRef, useMemo } from "react";
 import { useRouter } from "next/router";
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore, collection, doc, getDocs } from "firebase/firestore";
+import { getFirestore, collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { motion } from "framer-motion";
 
-export default function Filme() {
+export default function Serie() {
   const router = useRouter();
   const { id } = router.query;
   const videoRef = useRef(null);
@@ -23,7 +23,7 @@ export default function Filme() {
   const app = useMemo(() => (getApps().length ? getApp() : initializeApp(firebaseConfig)), []);
   const db = useMemo(() => getFirestore(app), [app]);
 
-  const [filme, setFilme] = useState(null);
+  const [serie, setSerie] = useState(null);
   const [videoAtual, setVideoAtual] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [savedTime, setSavedTime] = useState(0);
@@ -31,30 +31,33 @@ export default function Filme() {
   useEffect(() => {
     if (!id) return;
 
-    async function carregarFilme() {
-      // Percorrer todas as categorias para encontrar o filme pelo ID
+    async function carregarSerie() {
+      // Percorrer todas as categorias para encontrar a série pelo ID
       const categoriasSnap = await getDocs(collection(db, "categorias"));
-      let encontrado = null;
+      let encontrada = null;
 
       for (const catDoc of categoriasSnap.docs) {
         const catId = catDoc.id;
-        const filmesSnap = await getDocs(collection(db, "categorias", catId, "filmes"));
-        for (const f of filmesSnap.docs) {
-          if (f.id === id) {
-            encontrado = { id: f.id, categoriaId: catId, ...f.data() };
+        const seriesSnap = await getDocs(collection(db, "categorias", catId, "series"));
+        for (const s of seriesSnap.docs) {
+          if (s.id === id) {
+            encontrada = { id: s.id, categoriaId: catId, ...s.data() };
             break;
           }
         }
-        if (encontrado) break;
+        if (encontrada) break;
       }
 
-      if (encontrado) {
-        setFilme(encontrado);
-        setVideoAtual(encontrado.video || "");
+      if (encontrada) {
+        setSerie(encontrada);
+        // Define o primeiro capítulo como vídeo inicial
+        if (encontrada.temporadas?.length > 0 && encontrada.temporadas[0].capitulos?.length > 0) {
+          setVideoAtual(encontrada.temporadas[0].capitulos[0].video);
+        }
       }
     }
 
-    carregarFilme();
+    carregarSerie();
   }, [id, db]);
 
   useEffect(() => {
@@ -89,13 +92,15 @@ export default function Filme() {
     setModalOpen(false);
   };
 
+  const escolherCapitulo = (cap) => setVideoAtual(cap.video);
+
   return (
     <div className="min-h-screen relative text-white overflow-hidden">
       <div className="absolute inset-0 animate-gradient bg-gradient-to-r from-purple-600 via-pink-500 to-blue-500 opacity-30" />
-      {filme?.capa && (
+      {serie?.capa && (
         <div
           className="absolute inset-0 bg-cover bg-center blur-sm scale-105 opacity-40"
-          style={{ backgroundImage: `url(${filme.capa})` }}
+          style={{ backgroundImage: `url(${serie.capa})` }}
         />
       )}
       <div className="absolute inset-0 bg-black/60" />
@@ -132,21 +137,21 @@ export default function Filme() {
       )}
 
       <div className="relative z-10 px-4 sm:px-8 py-8 max-w-6xl mx-auto">
-        {filme && (
+        {serie && (
           <>
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
               <div>
-                <h1 className="text-4xl sm:text-6xl font-bold">{filme.titulo}</h1>
+                <h1 className="text-4xl sm:text-6xl font-bold">{serie.titulo}</h1>
                 <div className="flex items-center gap-2 mt-2">
                   {Array.from({ length: 5 }).map((_, i) => (
-                    <span key={i} className={`text-yellow-400 text-xl ${i < (filme.estrelas || 5) ? "" : "opacity-40"}`}>★</span>
+                    <span key={i} className={`text-yellow-400 text-xl ${i < (serie.estrelas || 5) ? "" : "opacity-40"}`}>★</span>
                   ))}
                 </div>
               </div>
             </div>
 
             <p className="max-w-3xl text-gray-200 mb-8 border-l-4 border-red-600 pl-4 text-sm sm:text-base">
-              {filme.descricao}
+              {serie.descricao}
             </p>
 
             <div className="w-full bg-black rounded-xl overflow-hidden shadow-2xl mb-10 relative">
@@ -158,6 +163,23 @@ export default function Filme() {
                   autoPlay
                   className="w-full aspect-video bg-black rounded-xl"
                 />
+              )}
+            </div>
+
+            <h2 className="text-3xl font-semibold mb-6">Episódios</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              {serie.temporadas?.map((t, i) =>
+                t.capitulos?.map((cap, j) => (
+                  <motion.div
+                    key={`${i}-${j}`}
+                    onClick={() => escolherCapitulo(cap)}
+                    whileHover={{ scale: 1.05 }}
+                    className="cursor-pointer bg-white/10 hover:bg-red-600/80 transition-all duration-300 rounded-lg p-3 flex flex-col items-center justify-center aspect-video shadow-lg"
+                  >
+                    <span className="font-bold text-lg">{cap.nome}</span>
+                    <span className="text-xs opacity-80 mt-1">{cap.texto || "Assistir"}</span>
+                  </motion.div>
+                ))
               )}
             </div>
           </>
