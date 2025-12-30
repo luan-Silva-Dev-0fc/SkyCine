@@ -3,22 +3,26 @@
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/router";
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore, collection, getDocs } from "firebase/firestore";
+import { getFirestore, collection, getDocs, doc, getDoc } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 import { motion, AnimatePresence } from "framer-motion";
+import { FiSearch, FiMenu, FiSettings, FiMessageCircle, FiPlay, FiX } from "react-icons/fi";
 
 export default function Home() {
   const router = useRouter();
-
   const [categorias, setCategorias] = useState([]);
   const [filmes, setFilmes] = useState([]);
   const [series, setSeries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [showMenu, setShowMenu] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
 
-  // Modal secreto
+  // Modal secreto e Perfil
   const [showModal, setShowModal] = useState(false);
   const [codigoAnimado, setCodigoAnimado] = useState("");
+  const [perfil, setPerfil] = useState(null);
+  const [showWelcome, setShowWelcome] = useState(false);
 
   const firebaseConfig = {
     apiKey: "AIzaSyDz6mdcZQ_Z3815u50nJCjqy4GEOyndn5k",
@@ -29,305 +33,317 @@ export default function Home() {
     appId: "1:1084857538934:web:8cda5903b8e7ef74b4c257",
   };
 
-  const app = useMemo(
-    () => (getApps().length ? getApp() : initializeApp(firebaseConfig)),
-    []
-  );
+  const app = useMemo(() => (getApps().length ? getApp() : initializeApp(firebaseConfig)), []);
   const db = useMemo(() => getFirestore(app), [app]);
 
-  const loadData = async () => {
-    setLoading(true);
-
-    const categoriasSnap = await getDocs(collection(db, "categorias"));
-    const categoriasArray = categoriasSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    setCategorias(categoriasArray);
-
-    const filmesArray = [];
-    const seriesArray = [];
-
-    for (const cat of categoriasArray) {
-      const filmesSnap = await getDocs(collection(db, "categorias", cat.id, "filmes"));
-      filmesSnap.forEach(f => {
-        const data = f.data();
-        filmesArray.push({
-          id: f.id,
-          categoriaId: cat.id,
-          categoriaNome: cat.nome,
-          titulo: data.titulo,
-          capa: data.capa,
-          video: data.video,
-        });
-      });
-
-      const seriesSnap = await getDocs(collection(db, "categorias", cat.id, "series"));
-      seriesSnap.forEach(s => {
-        const data = s.data();
-        let capaSerie = data.capa;
-        if (!capaSerie && data.temporadas?.length > 0 && data.temporadas[0].capitulos?.length > 0) {
-          capaSerie = data.temporadas[0].capitulos[0].video;
-        }
-        seriesArray.push({
-          id: s.id,
-          categoriaId: cat.id,
-          categoriaNome: cat.nome,
-          titulo: data.titulo,
-          capa: capaSerie || "",
-        });
-      });
-    }
-
-    setFilmes(filmesArray);
-    setSeries(seriesArray);
-    setLoading(false);
-  };
-
+  // Efeito de Scroll para a Navbar
   useEffect(() => {
-    loadData();
+    const handleScroll = () => setScrolled(window.scrollY > 50);
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const filmesFiltrados = filmes.filter(f => f.titulo.toLowerCase().includes(search.toLowerCase()));
-  const seriesFiltradas = series.filter(s => s.titulo.toLowerCase().includes(search.toLowerCase()));
+  // Carregar Perfil do Usuário
+  useEffect(() => {
+    const fetchPerfil = async () => {
+      try {
+        const user = getAuth().currentUser;
+        if (!user) return;
+        const ref = doc(db, "users", user.uid);
+        const snap = await getDoc(ref);
+        if (snap.exists()) {
+          setPerfil(snap.data());
+          const lastWelcome = localStorage.getItem("lastWelcome");
+          const now = Date.now();
+          if (!lastWelcome || now - Number(lastWelcome) > 24 * 60 * 60 * 1000) {
+            setShowWelcome(true);
+            localStorage.setItem("lastWelcome", now.toString());
+            setTimeout(() => setShowWelcome(false), 5000);
+          }
+        }
+      } catch (err) { console.error(err); }
+    };
+    fetchPerfil();
+  }, [db]);
 
+  // Carregar Dados do Firestore
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const categoriasSnap = await getDocs(collection(db, "categorias"));
+      const categoriasArray = categoriasSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setCategorias(categoriasArray);
+
+      const filmesArray = [];
+      const seriesArray = [];
+
+      for (const cat of categoriasArray) {
+        const filmesSnap = await getDocs(collection(db, "categorias", cat.id, "filmes"));
+        filmesSnap.forEach(f => {
+          filmesArray.push({ id: f.id, categoriaId: cat.id, categoriaNome: cat.nome, ...f.data() });
+        });
+        const seriesSnap = await getDocs(collection(db, "categorias", cat.id, "series"));
+        seriesSnap.forEach(s => {
+          seriesArray.push({ id: s.id, categoriaId: cat.id, categoriaNome: cat.nome, ...s.data() });
+        });
+      }
+      setFilmes(filmesArray);
+      setSeries(seriesArray);
+    } catch (error) {
+      console.error("Erro ao carregar dados:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { loadData(); }, []);
+
+  // Filme em Destaque Aleatório
   const filmeDestaque = useMemo(() => {
     if (!filmes.length) return null;
     return filmes[Math.floor(Math.random() * filmes.length)];
   }, [filmes]);
 
-  // Efeito antigo de swipe para loja
+  // Gesto secreto (Swipe Right para Loja)
   useEffect(() => {
     let startX = null;
-    let startY = null;
-
-    const touchStart = (e) => {
-      startX = e.touches[0].clientX;
-      startY = e.touches[0].clientY;
-    };
-
+    const touchStart = (e) => startX = e.touches[0].clientX;
     const touchMove = (e) => {
-      if (startX === null || startY === null) return;
+      if (startX === null) return;
       const deltaX = e.touches[0].clientX - startX;
-      const deltaY = e.touches[0].clientY - startY;
-      if (deltaX > 50 && deltaY > 50) {
-        router.push("/loja");
-        startX = null;
-        startY = null;
+      if (deltaX > 150 && !showModal) {
+        setShowModal(true);
+        const linhas = ["Iniciando Protocolo...", "Bypass de Segurança...", "Portal da Loja Aberto!"];
+        let i = 0;
+        const int = setInterval(() => {
+          setCodigoAnimado(linhas[i]); i++;
+          if (i >= linhas.length) { clearInterval(int); router.push("/loja"); }
+        }, 800);
       }
     };
-
     window.addEventListener("touchstart", touchStart);
     window.addEventListener("touchmove", touchMove);
-
-    return () => {
-      window.removeEventListener("touchstart", touchStart);
-      window.removeEventListener("touchmove", touchMove);
-    };
-  }, [router]);
-
-  // Detecção de L com modal, fala e animação
-  useEffect(() => {
-    let touchPath = [];
-    const maxPathLength = 20;
-
-    const speak = (message) => {
-      if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance(message);
-        speechSynthesis.speak(utterance);
-      }
-    };
-
-    const touchStart = (e) => {
-      touchPath = [{ x: e.touches[0].clientX, y: e.touches[0].clientY }];
-    };
-
-    const touchMove = (e) => {
-      const point = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-      if (touchPath.length < maxPathLength) touchPath.push(point);
-
-      if (touchPath.length > 5) {
-        const start = touchPath[0];
-        const mid = touchPath[Math.floor(touchPath.length / 2)];
-        const end = touchPath[touchPath.length - 1];
-
-        const verticalMove = mid.y - start.y > 50 && Math.abs(mid.x - start.x) < 50;
-        const horizontalMove = end.x - mid.x > 50 && Math.abs(end.y - mid.y) < 50;
-
-        if (verticalMove && horizontalMove && !showModal) {
-          speak("Ok, já entendi este comando. Estou encaminhando você para nossa nossa loja secreta.");
-          setShowModal(true);
-
-          const linhas = [
-            "Carregando módulo secreto...",
-            "Autenticando usuário...",
-            "Conectando ao servidor...",
-            "Abrindo portal da loja secreta..."
-          ];
-
-          let i = 0;
-          const interval = setInterval(() => {
-            setCodigoAnimado(linhas[i]);
-            i++;
-            if (i >= linhas.length) {
-              clearInterval(interval);
-              router.push("/loja");
-            }
-          }, 1000);
-        }
-      }
-    };
-
-    window.addEventListener("touchstart", touchStart);
-    window.addEventListener("touchmove", touchMove);
-
-    return () => {
-      window.removeEventListener("touchstart", touchStart);
-      window.removeEventListener("touchmove", touchMove);
-    };
+    return () => { window.removeEventListener("touchstart", touchStart); window.removeEventListener("touchmove", touchMove); };
   }, [router, showModal]);
 
-  if (loading) return <div className="text-white p-6">Carregando...</div>;
+  if (loading) return (
+    <div className="h-screen bg-black flex flex-col items-center justify-center">
+      <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin mb-4" />
+      <h1 className="text-white font-black tracking-[0.3em] uppercase animate-pulse">SkyCine</h1>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen relative bg-gray-900 text-white overflow-hidden">
+    <div className="min-h-screen bg-[#070707] text-white font-sans selection:bg-red-600 overflow-x-hidden">
+      
+      {/* Navbar Dinâmica */}
+      <nav className={`fixed top-0 w-full z-50 transition-all duration-500 px-6 py-4 flex items-center justify-between ${scrolled ? "bg-black/95 backdrop-blur-xl border-b border-white/5 shadow-2xl" : "bg-transparent"}`}>
+        <div className="flex items-center gap-6">
+          <button onClick={() => setShowMenu(true)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+            <FiMenu size={24} />
+          </button>
+          <h1 className="text-2xl font-black italic tracking-tighter uppercase cursor-pointer" onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})}>
+            Sky<span className="text-red-600">Cine</span>
+          </h1>
+        </div>
 
-      {filmeDestaque && (
-        <div className="relative w-full h-[60vh] overflow-hidden">
-          <video
-            src={filmeDestaque.video}
-            autoPlay
-            loop
-            muted
-            className="w-full h-full object-cover"
-          />
-          {filmeDestaque.capa && (
-            <div className="absolute bottom-6 left-6 flex flex-col gap-4">
-              <img src={filmeDestaque.capa} className="w-40 md:w-60 rounded-lg shadow-xl" alt={filmeDestaque.titulo} />
-              <button
-                onClick={() => router.push(`/idfilmes?id=${filmeDestaque.id}`)}
-                className="bg-red-600 py-2 px-6 rounded-lg font-bold hover:bg-red-700"
-              >
-                Assistir
-              </button>
+        <div className="hidden md:flex flex-1 max-w-md mx-8 relative">
+           <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" />
+           <input 
+             type="text" 
+             placeholder="O que você quer assistir?" 
+             className="w-full bg-white/5 border border-white/10 pl-12 pr-4 py-2.5 rounded-2xl focus:bg-white/10 focus:border-red-600/50 transition-all outline-none text-sm"
+             value={search}
+             onChange={e => setSearch(e.target.value)}
+           />
+        </div>
+
+        <div className="flex items-center gap-4">
+          {perfil && (
+            <div className="flex items-center gap-3 bg-white/5 p-1.5 pr-5 rounded-full border border-white/10 hover:bg-white/10 transition-colors">
+              <div className="w-8 h-8 rounded-full border-2 border-red-600 overflow-hidden shadow-lg">
+                <img src={perfil.avatar || "https://via.placeholder.com/150"} className="w-full h-full object-cover" alt="avatar" />
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-widest hidden sm:block">{perfil.nome}</span>
             </div>
           )}
         </div>
+      </nav>
+
+      {/* Hero Section (Destaque) */}
+      {filmeDestaque && (
+        <section className="relative w-full h-[80vh] flex items-end pb-24 px-6 md:px-16 overflow-hidden">
+          <video 
+            src={filmeDestaque.video} autoPlay loop muted playsInline
+            className="absolute inset-0 w-full h-full object-cover scale-105 pointer-events-none" 
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#070707] via-[#070707]/40 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#070707] via-transparent to-transparent" />
+          
+          <motion.div 
+            initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}
+            className="relative z-10 max-w-2xl"
+          >
+            <div className="flex items-center gap-3 mb-4">
+                <span className="bg-red-600 text-[9px] font-black uppercase px-2 py-1 rounded-sm tracking-[0.2em]">Original</span>
+                <span className="text-zinc-400 text-xs font-bold uppercase tracking-widest underline decoration-red-600">Em Alta</span>
+            </div>
+            <h2 className="text-5xl md:text-8xl font-black uppercase italic mb-8 leading-none tracking-tighter drop-shadow-2xl">{filmeDestaque.titulo}</h2>
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={() => router.push(`/idfilmes?id=${filmeDestaque.id}`)}
+                className="bg-white text-black px-10 py-4 rounded-2xl font-black flex items-center gap-3 hover:bg-red-600 hover:text-white hover:scale-105 active:scale-95 transition-all shadow-2xl uppercase text-xs tracking-widest"
+              >
+                <FiPlay fill="currentColor" size={18} /> Assistir Agora
+              </button>
+            </div>
+          </motion.div>
+        </section>
       )}
 
-      {/* Topo */}
-      <div className="absolute top-0 left-0 w-full z-10 flex items-center justify-between py-4 px-6">
-        <button onClick={() => setShowMenu(!showMenu)} className="flex flex-col gap-1">
-          <span className="w-6 h-0.5 bg-white"></span>
-          <span className="w-6 h-0.5 bg-white"></span>
-          <span className="w-6 h-0.5 bg-white"></span>
-        </button>
-        <h1 className="text-4xl font-bold text-white">SkyCine</h1>
-        <div className="w-10 h-10 bg-red-600 rounded-full flex items-center justify-center font-bold text-white cursor-pointer">
-          P
-        </div>
-      </div>
-
-      {/* Busca */}
-      <div className="absolute top-20 left-0 w-full flex justify-center px-6 z-10">
-        <input
-          type="text"
-          placeholder="Pesquisar filmes ou séries..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="w-full max-w-md bg-white/10 placeholder-white/70 px-4 py-2 rounded-full outline-none"
-        />
-      </div>
-
-      {/* Menu lateral */}
+      {/* Mensagem de Boas-vindas Dinâmica */}
       <AnimatePresence>
-        {showMenu && (
-          <motion.div
-            initial={{ x: -300 }}
-            animate={{ x: 0 }}
-            exit={{ x: -300 }}
-            className="fixed top-0 left-0 h-full w-64 bg-gray-800 z-40 p-6 shadow-lg"
+        {showWelcome && perfil && (
+          <motion.div 
+            initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 50 }}
+            className="fixed top-24 right-6 z-[60] bg-white/10 backdrop-blur-xl border border-white/20 p-4 rounded-2xl shadow-2xl flex items-center gap-4"
           >
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Categorias</h2>
-              <button className="text-white font-bold" onClick={() => setShowMenu(false)}>×</button>
+            <div className="w-10 h-10 bg-red-600 rounded-full flex items-center justify-center font-black">!</div>
+            <div>
+              <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest leading-none">Bem-vindo de volta</p>
+              <h4 className="text-sm font-black text-white">{perfil.nome}</h4>
             </div>
-            <ul className="flex flex-col gap-3">
-              {categorias.map(cat => (
-                <li key={cat.id} className="cursor-pointer hover:text-red-500" onClick={() => setShowMenu(false)}>
-                  {cat.nome}
-                </li>
-              ))}
-            </ul>
-            <button className="mt-6 w-full bg-gray-700 py-2 rounded-lg flex items-center justify-center gap-2">
-              ⚙️ Configurações
-            </button>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Conteúdo */}
-      <div className="relative z-10 mt-6 px-4 sm:px-6 md:px-8">
-        {categorias.map(cat => (
-          <div key={cat.id} className="mb-8">
-            <h2 className="text-2xl font-bold mb-4">{cat.nome}</h2>
+      {/* Listagem de Categorias e Filmes */}
+      <main className="relative z-20 -mt-16 pb-32 space-y-16">
+        {categorias.map(cat => {
+          const itensFiltrados = [
+            ...filmes.filter(f => f.categoriaId === cat.id && f.titulo.toLowerCase().includes(search.toLowerCase())),
+            ...series.filter(s => s.categoriaId === cat.id && s.titulo.toLowerCase().includes(search.toLowerCase()))
+          ];
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-              {filmesFiltrados.filter(f => f.categoriaId === cat.id).map(f => (
-                <div key={f.id} className="bg-white/5 rounded-xl overflow-hidden hover:scale-105 transition-transform cursor-pointer">
-                  <img src={f.capa} className="w-full aspect-[2/3] object-cover" />
-                  <div className="p-2 flex flex-col items-center">
-                    <div className="text-sm text-center mb-1">{f.titulo}</div>
-                    <button
-                      className="w-full bg-red-600 py-1 rounded-lg"
-                      onClick={() => router.push(`/idfilmes?id=${f.id}`)}
-                    >
-                      Assistir
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+          if (itensFiltrados.length === 0) return null;
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {seriesFiltradas.filter(s => s.categoriaId === cat.id).map(s => (
-                <div key={s.id} className="bg-white/5 rounded-xl overflow-hidden hover:scale-105 transition-transform cursor-pointer">
-                  <img src={s.capa} className="w-full aspect-[2/3] object-cover" />
-                  <div className="p-2 flex flex-col items-center">
-                    <div className="text-sm text-center mb-1">{s.titulo}</div>
-                    <button
-                      className="w-full bg-blue-600 py-1 rounded-lg"
-                      onClick={() => router.push(`/idseries?id=${s.id}`)}
-                    >
-                      Assistir
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
+          return (
+            <section key={cat.id} className="px-6 md:px-16 animate-in fade-in duration-700">
+              <div className="flex items-center justify-between mb-8">
+                <h3 className="text-2xl font-black uppercase tracking-tighter italic">
+                  {cat.nome}<span className="text-red-600">.</span>
+                </h3>
+                <div className="h-[1px] flex-1 bg-white/5 mx-6 hidden sm:block" />
+              </div>
+              
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6 md:gap-8">
+                {itensFiltrados.map(item => (
+                  <motion.div 
+                    whileHover={{ scale: 1.05 }}
+                    key={item.id} 
+                    className="group cursor-pointer"
+                    onClick={() => router.push(item.capitulos ? `/idseries?id=${item.id}` : `/idfilmes?id=${item.id}`)}
+                  >
+                    <div className="relative aspect-[2/3] rounded-[1.5rem] overflow-hidden border border-white/5 shadow-xl transition-all group-hover:shadow-red-600/20 group-hover:border-red-600/30">
+                      <img 
+                        src={item.capa} 
+                        className="w-full h-full object-cover transition duration-700 group-hover:scale-110" 
+                        alt={item.titulo}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
+                         <div className="w-full bg-white text-black py-3 rounded-xl text-center font-black text-[10px] uppercase tracking-widest shadow-2xl">
+                            {item.capitulos ? "Ver Temporadas" : "Reproduzir"}
+                         </div>
+                      </div>
+                    </div>
+                    <p className="mt-4 text-xs font-black text-zinc-500 group-hover:text-white transition uppercase tracking-widest truncate">
+                      {item.titulo}
+                    </p>
+                  </motion.div>
+                ))}
+              </div>
+            </section>
+          );
+        })}
+      </main>
 
-      {/* Modal do código */}
+      {/* BOTÃO SKYCHAT - Encaminha para /chat */}
+      <motion.button
+        whileHover={{ scale: 1.1, rotate: 5 }}
+        whileTap={{ scale: 0.9 }}
+        onClick={() => router.push("/chat")}
+        className="fixed bottom-8 right-8 z-50 flex items-center gap-3 px-6 py-4 bg-white text-black rounded-3xl shadow-[0_20px_50px_rgba(255,255,255,0.2)] hover:bg-zinc-100 transition-all border border-white/20 group"
+      >
+        <div className="relative">
+          <FiMessageCircle size={26} className="group-hover:text-red-600 transition-colors" />
+          <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white animate-pulse" />
+        </div>
+        <span className="text-[11px] font-black uppercase tracking-[0.2em] hidden sm:block">
+          SkyChat
+        </span>
+      </motion.button>
+
+      {/* Menu Lateral Estilizado */}
+      <AnimatePresence>
+        {showMenu && (
+          <>
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setShowMenu(false)}
+              className="fixed inset-0 bg-black/90 backdrop-blur-md z-[60]"
+            />
+            <motion.div
+              initial={{ x: -400 }} animate={{ x: 0 }} exit={{ x: -400 }}
+              className="fixed top-0 left-0 h-full w-80 bg-[#0c0c0c] z-[70] p-10 border-r border-white/5 shadow-2xl"
+            >
+              <div className="flex justify-between items-center mb-16">
+                <h2 className="text-3xl font-black italic uppercase tracking-tighter">Sky<span className="text-red-600">Menu</span></h2>
+                <button onClick={() => setShowMenu(false)}><FiX size={24} /></button>
+              </div>
+              <ul className="space-y-8">
+                {categorias.map(cat => (
+                  <li key={cat.id} 
+                    onClick={() => { setShowMenu(false); /* Adicione scroll para categoria aqui se desejar */ }}
+                    className="text-zinc-500 hover:text-white text-lg font-black uppercase tracking-widest cursor-pointer transition-all flex items-center gap-4 group"
+                  >
+                    <span className="w-0 group-hover:w-4 h-[2px] bg-red-600 transition-all rounded-full" />
+                    {cat.nome}
+                  </li>
+                ))}
+              </ul>
+              <div className="absolute bottom-10 left-10 right-10 flex flex-col gap-4">
+                <button 
+                   onClick={() => router.push("/configuracoes")}
+                   className="w-full flex items-center justify-center gap-3 bg-white/5 py-4 rounded-2xl hover:bg-white/10 transition text-[10px] font-black uppercase tracking-widest border border-white/5"
+                >
+                  <FiSettings size={18} /> Configurações
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Modal Secreto (Loja) */}
       <AnimatePresence>
         {showModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
-          >
-            <motion.div
-              initial={{ scale: 0.8 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0.8 }}
-              className="bg-gray-900 text-green-400 p-8 rounded-xl w-80 text-center font-mono"
-            >
-              <p className="mb-4">💻 Sistema detectou seu comando secreto!</p>
-              <p className="mb-2 animate-pulse">{codigoAnimado}</p>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/98 flex items-center justify-center z-[100] p-6">
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="bg-[#111] border border-emerald-500/20 p-12 rounded-[3rem] w-full max-w-sm text-center font-mono shadow-2xl">
+              <div className="w-16 h-16 border-t-2 border-emerald-500 rounded-full animate-spin mx-auto mb-8" />
+              <p className="text-emerald-500 text-[10px] mb-4 uppercase tracking-[0.5em] font-black">Acessando Camada Oculta</p>
+              <p className="text-white text-sm font-bold opacity-80">{codigoAnimado}</p>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
+      <style jsx global>{`
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: #070707; }
+        ::-webkit-scrollbar-thumb { background: #222; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #E50914; }
+        body { background-color: #070707; }
+      `}</style>
     </div>
   );
 }
