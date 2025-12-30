@@ -1,201 +1,203 @@
 "use client";
 
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore, collection, doc, getDoc, getDocs } from "firebase/firestore";
-import { motion } from "framer-motion";
+import { getFirestore, doc, getDoc } from "firebase/firestore";
+import { motion, AnimatePresence } from "framer-motion";
+import { FiClock, FiStar, FiChevronLeft, FiPlay, FiLayers, FiFastForward } from "react-icons/fi";
 
-export default function Serie() {
+const firebaseConfig = {
+  apiKey: "AIzaSyDz6mdcZQ_Z3815u50nJCjqy4GEOyndn5k",
+  authDomain: "skycine-c59b0.firebaseapp.com",
+  projectId: "skycine-c59b0",
+  storageBucket: "skycine-c59b0.firebasestorage.app",
+  messagingSenderId: "1084857538934",
+  appId: "1:1084857538934:web:8cda5903b8e7ef74b4c257",
+};
+
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+export default function PlayerSerie() {
   const router = useRouter();
-  const { id } = router.query;
+  const { id } = router.query; 
   const videoRef = useRef(null);
-
-  const firebaseConfig = {
-    apiKey: "AIzaSyDz6mdcZQ_Z3815u50nJCjqy4GEOyndn5k",
-    authDomain: "skycine-c59b0.firebaseapp.com",
-    projectId: "skycine-c59b0",
-    storageBucket: "skycine-c59b0.firebasestorage.app",
-    messagingSenderId: "1084857538934",
-    appId: "1:1084857538934:web:8cda5903b8e7ef74b4c257",
-  };
-
-  const app = useMemo(() => (getApps().length ? getApp() : initializeApp(firebaseConfig)), []);
-  const db = useMemo(() => getFirestore(app), [app]);
 
   const [serie, setSerie] = useState(null);
   const [videoAtual, setVideoAtual] = useState("");
+  const [capituloAtivo, setCapituloAtivo] = useState(null);
+  const [tempAtivaIndex, setTempAtivaIndex] = useState(0);
   const [modalOpen, setModalOpen] = useState(false);
   const [savedTime, setSavedTime] = useState(0);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!id) return;
+    // Importante: Só executa quando o roteador está pronto e o ID existe
+    if (!router.isReady || !id) return;
 
-    async function carregarSerie() {
-      // Percorrer todas as categorias para encontrar a série pelo ID
-      const categoriasSnap = await getDocs(collection(db, "categorias"));
-      let encontrada = null;
+    async function buscarSerie() {
+      console.log("Buscando série com ID:", id); // DEBUG
+      setLoading(true);
+      try {
+        // Tenta buscar na coleção global que configuramos no Admin
+        const serieRef = doc(db, "todos_os_conteudos", String(id));
+        const serieSnap = await getDoc(serieRef);
 
-      for (const catDoc of categoriasSnap.docs) {
-        const catId = catDoc.id;
-        const seriesSnap = await getDocs(collection(db, "categorias", catId, "series"));
-        for (const s of seriesSnap.docs) {
-          if (s.id === id) {
-            encontrada = { id: s.id, categoriaId: catId, ...s.data() };
-            break;
+        if (serieSnap.exists()) {
+          const dados = serieSnap.data();
+          console.log("Dados encontrados:", dados); // DEBUG
+          setSerie(dados);
+          
+          // Verifica se existem temporadas e capítulos
+          const primeiraTemp = dados.temporadas?.[0];
+          const primeiroCap = primeiraTemp?.capitulos?.[0];
+
+          if (primeiroCap) {
+            setVideoAtual(primeiroCap.video);
+            setCapituloAtivo(primeiroCap);
+          } else {
+            console.warn("Série encontrada, mas está sem capítulos cadastrados.");
           }
+        } else {
+          console.error("Documento não existe no caminho: todos_os_conteudos/" + id);
         }
-        if (encontrada) break;
-      }
-
-      if (encontrada) {
-        setSerie(encontrada);
-        // Define o primeiro capítulo como vídeo inicial
-        if (encontrada.temporadas?.length > 0 && encontrada.temporadas[0].capitulos?.length > 0) {
-          setVideoAtual(encontrada.temporadas[0].capitulos[0].video);
-        }
+      } catch (err) {
+        console.error("Erro Firebase:", err);
+      } finally {
+        setLoading(false);
       }
     }
 
-    carregarSerie();
-  }, [id, db]);
+    buscarSerie();
+  }, [id, router.isReady]);
 
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video || !videoAtual) return;
-
-    const saved = localStorage.getItem(`video-${videoAtual}`);
-    if (saved) {
-      setSavedTime(parseFloat(saved));
-      setModalOpen(true);
+  const trocarEpisodio = (tempIdx, capIdx) => {
+    const proximoCap = serie.temporadas[tempIdx]?.capitulos[capIdx];
+    if (proximoCap) {
+      setTempAtivaIndex(tempIdx);
+      setVideoAtual(proximoCap.video);
+      setCapituloAtivo(proximoCap);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-
-    const salvarProgresso = () => localStorage.setItem(`video-${videoAtual}`, video.currentTime.toString());
-
-    video.addEventListener("pause", salvarProgresso);
-    window.addEventListener("beforeunload", salvarProgresso);
-
-    return () => {
-      video.removeEventListener("pause", salvarProgresso);
-      window.removeEventListener("beforeunload", salvarProgresso);
-    };
-  }, [videoAtual]);
-
-  const continuarVideo = () => {
-    videoRef.current.currentTime = savedTime;
-    videoRef.current.play();
-    setModalOpen(false);
   };
 
-  const começarDoInicio = () => {
-    videoRef.current.play();
-    setModalOpen(false);
+  const proximoEpisodio = () => {
+    if (!serie) return;
+    const currentTemp = serie.temporadas[tempAtivaIndex];
+    const currentCapIdx = currentTemp.capitulos.findIndex(c => c.video === videoAtual);
+
+    if (currentCapIdx < currentTemp.capitulos.length - 1) {
+      trocarEpisodio(tempAtivaIndex, currentCapIdx + 1);
+    } else if (tempAtivaIndex < serie.temporadas.length - 1) {
+      trocarEpisodio(tempAtivaIndex + 1, 0);
+    }
   };
 
-  const escolherCapitulo = (cap) => setVideoAtual(cap.video);
+  const monitorarTempo = () => {
+    if (videoRef.current && videoRef.current.currentTime > 5) {
+      localStorage.setItem(`progresso-${videoAtual}`, videoRef.current.currentTime.toString());
+    }
+  };
+
+  if (!router.isReady || loading) return (
+    <div className="h-screen bg-[#050505] flex items-center justify-center">
+      <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
+  // Caso o carregamento termine e não tenha série
+  if (!serie) return (
+    <div className="h-screen bg-[#050505] flex flex-col items-center justify-center text-white p-6">
+      <h1 className="text-2xl font-bold mb-4">Série não encontrada</h1>
+      <button onClick={() => router.back()} className="px-6 py-2 bg-red-600 rounded-full font-bold">Voltar</button>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen relative text-white overflow-hidden">
-      <div className="absolute inset-0 animate-gradient bg-gradient-to-r from-purple-600 via-pink-500 to-blue-500 opacity-30" />
-      {serie?.capa && (
-        <div
-          className="absolute inset-0 bg-cover bg-center blur-sm scale-105 opacity-40"
+    <div className="min-h-screen bg-[#050505] text-white font-sans selection:bg-red-600">
+      
+      {/* Background Cinematográfico */}
+      <div className="fixed inset-0 z-0">
+        <div 
+          className="absolute inset-0 bg-cover bg-center opacity-30 blur-[100px] scale-125"
           style={{ backgroundImage: `url(${serie.capa})` }}
         />
-      )}
-      <div className="absolute inset-0 bg-black/60" />
-
-      {modalOpen && (
-        <div className="fixed inset-0 flex items-center justify-center z-50">
-          <motion.div
-            initial={{ scale: 0.7, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.7, opacity: 0 }}
-            className="bg-gray-900 rounded-xl shadow-2xl p-6 max-w-sm text-center"
-          >
-            <h2 className="text-red-600 text-lg font-bold mb-4">Continuar de onde parou?</h2>
-            <p className="text-gray-300 mb-6">
-              Você parou em {Math.floor(savedTime / 60)}:
-              {Math.floor(savedTime % 60).toString().padStart(2, "0")}
-            </p>
-            <div className="flex justify-center gap-4">
-              <button
-                onClick={continuarVideo}
-                className="px-4 py-2 bg-red-600 rounded-lg font-semibold hover:bg-red-700"
-              >
-                Continuar
-              </button>
-              <button
-                onClick={começarDoInicio}
-                className="px-4 py-2 bg-gray-600 rounded-lg font-semibold hover:bg-gray-500"
-              >
-                Começar do Início
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
-
-      <div className="relative z-10 px-4 sm:px-8 py-8 max-w-6xl mx-auto">
-        {serie && (
-          <>
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-              <div>
-                <h1 className="text-4xl sm:text-6xl font-bold">{serie.titulo}</h1>
-                <div className="flex items-center gap-2 mt-2">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <span key={i} className={`text-yellow-400 text-xl ${i < (serie.estrelas || 5) ? "" : "opacity-40"}`}>★</span>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <p className="max-w-3xl text-gray-200 mb-8 border-l-4 border-red-600 pl-4 text-sm sm:text-base">
-              {serie.descricao}
-            </p>
-
-            <div className="w-full bg-black rounded-xl overflow-hidden shadow-2xl mb-10 relative">
-              {videoAtual && (
-                <video
-                  ref={videoRef}
-                  src={videoAtual}
-                  controls
-                  autoPlay
-                  className="w-full aspect-video bg-black rounded-xl"
-                />
-              )}
-            </div>
-
-            <h2 className="text-3xl font-semibold mb-6">Episódios</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              {serie.temporadas?.map((t, i) =>
-                t.capitulos?.map((cap, j) => (
-                  <motion.div
-                    key={`${i}-${j}`}
-                    onClick={() => escolherCapitulo(cap)}
-                    whileHover={{ scale: 1.05 }}
-                    className="cursor-pointer bg-white/10 hover:bg-red-600/80 transition-all duration-300 rounded-lg p-3 flex flex-col items-center justify-center aspect-video shadow-lg"
-                  >
-                    <span className="font-bold text-lg">{cap.nome}</span>
-                    <span className="text-xs opacity-80 mt-1">{cap.texto || "Assistir"}</span>
-                  </motion.div>
-                ))
-              )}
-            </div>
-          </>
-        )}
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#050505]/80 to-[#050505]" />
       </div>
 
-      <style jsx>{`
-        @keyframes gradient {
-          0% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-          100% { background-position: 0% 50%; }
-        }
-        .animate-gradient {
-          background-size: 200% 200%;
-          animation: gradient 15s ease infinite;
-        }
+      <div className="relative z-10 max-w-[1600px] mx-auto px-6 py-8">
+        <header className="mb-8">
+          <button onClick={() => router.back()} className="flex items-center gap-2 text-zinc-500 hover:text-white transition-all font-black uppercase text-[10px] tracking-widest">
+            <FiChevronLeft className="text-lg"/> Voltar
+          </button>
+        </header>
+
+        <div className="grid lg:grid-cols-12 gap-10">
+          <div className="lg:col-span-8 space-y-8">
+            <div className="aspect-video bg-black rounded-[2rem] overflow-hidden shadow-2xl ring-1 ring-white/10">
+              <video 
+                key={videoAtual}
+                ref={videoRef}
+                src={videoAtual}
+                controls
+                autoPlay
+                onTimeUpdate={monitorarTempo}
+                onEnded={proximoEpisodio}
+                className="w-full h-full"
+              />
+            </div>
+
+            <div className="bg-white/5 p-8 rounded-[2.5rem] border border-white/5">
+               <h1 className="text-4xl md:text-5xl font-black tracking-tighter uppercase italic mb-2">{serie.titulo}</h1>
+               <div className="flex items-center gap-4 text-[10px] font-bold text-red-600 uppercase tracking-widest">
+                  <span className="flex items-center gap-1 text-yellow-500"><FiStar className="fill-current"/> {serie.estrelas || "5.0"}</span>
+                  <span className="text-zinc-500">•</span>
+                  <span className="text-zinc-300">{capituloAtivo?.nome || "Carregando..."}</span>
+               </div>
+            </div>
+          </div>
+
+          <div className="lg:col-span-4">
+            <div className="bg-zinc-900/50 backdrop-blur-3xl border border-white/10 rounded-[3rem] p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2"><FiLayers className="text-red-600"/> Temporadas</h2>
+                <select 
+                  value={tempAtivaIndex}
+                  onChange={(e) => setTempAtivaIndex(parseInt(e.target.value))}
+                  className="bg-black/40 border border-white/10 rounded-lg px-3 py-1 text-[10px] font-bold outline-none"
+                >
+                  {serie.temporadas?.map((t, i) => <option key={i} value={i}>{t.nome}</option>)}
+                </select>
+              </div>
+
+              <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                {serie.temporadas?.[tempAtivaIndex]?.capitulos?.map((cap, j) => {
+                  const isSelected = videoAtual === cap.video;
+                  return (
+                    <button
+                      key={j}
+                      onClick={() => trocarEpisodio(tempAtivaIndex, j)}
+                      className={`w-full p-4 rounded-xl flex items-center gap-4 transition-all border ${isSelected ? "bg-red-600 border-red-400 shadow-lg shadow-red-600/20" : "bg-white/5 border-transparent hover:bg-white/10"}`}
+                    >
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isSelected ? "bg-white/20" : "bg-zinc-800"}`}>
+                        {isSelected ? <FiPlay className="fill-current text-white"/> : <span className="text-[10px] font-black text-zinc-500">{j + 1}</span>}
+                      </div>
+                      <div className="text-left truncate">
+                        <p className={`text-[10px] font-black uppercase truncate ${isSelected ? "text-white" : "text-zinc-300"}`}>{cap.nome}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <style jsx global>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
       `}</style>
     </div>
   );
