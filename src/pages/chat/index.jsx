@@ -15,8 +15,9 @@ import {
   serverTimestamp,
   doc,
   updateDoc,
-  getDoc,
 } from "firebase/firestore";
+import { motion, AnimatePresence } from "framer-motion";
+import { FiHash, FiLock, FiUnlock, FiUsers, FiPlus, FiTerminal, FiGlobe, FiShield, FiCpu, FiX } from "react-icons/fi";
 
 // Configurações MANTIDAS
 const firebaseConfig = {
@@ -32,258 +33,273 @@ const db = getFirestore(app);
 export default function SkyChatUI() {
   const router = useRouter();
   const [user, setUser] = useState(null);
-  const [chats, setChats] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [invites, setInvites] = useState([]);
+  const [allGroups, setAllGroups] = useState([]);
+  const [usersCount, setUsersCount] = useState(0);
   const [showGroupModal, setShowGroupModal] = useState(false);
+  const [showPassModal, setShowPassModal] = useState(null);
+  
   const [groupName, setGroupName] = useState("");
   const [groupPassword, setGroupPassword] = useState("");
-  const [selectedUsers, setSelectedUsers] = useState([]);
+  const [inputPass, setInputPass] = useState("");
+  const [activeTab, setActiveTab] = useState("meus");
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
       if (!u) return router.replace("/");
       setUser(u);
 
-      const q = query(
-        collection(db, "chats"),
-        where("members", "array-contains", u.uid)
-      );
-      onSnapshot(q, (snap) =>
-        setChats(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
-      );
+      const qAll = query(collection(db, "chats"), where("isGroup", "==", true));
+      onSnapshot(qAll, (snap) => {
+        setAllGroups(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      });
 
       const usersSnap = await getDocs(collection(db, "users"));
-      setUsers(
-        usersSnap.docs
-          .map((d) => ({ id: d.id, ...d.data() }))
-          .filter((u2) => u2.id !== u.uid)
-      );
-
-      const qInvites = query(
-        collection(db, "groupInvites"),
-        where("to", "==", u.uid),
-        where("status", "==", "pending")
-      );
-      onSnapshot(qInvites, (snap) => {
-        setInvites(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-      });
+      setUsersCount(usersSnap.size);
     });
 
     return () => unsub();
   }, [router]);
 
-  const aceitarGrupo = async (invite) => {
-    try {
-      const chatRef = doc(db, "chats", invite.chatId);
-      const chatSnap = await getDoc(chatRef);
-      if (!chatSnap.exists()) return;
-      const chatData = chatSnap.data();
-      await updateDoc(chatRef, { members: [...chatData.members, user.uid] });
-      await updateDoc(doc(db, "groupInvites", invite.id), { status: "accepted" });
-    } catch (err) {
-      console.error(err);
+  const entrarNoGrupo = async (group) => {
+    if (group.members.includes(user.uid)) {
+      router.push(`/chat/${group.id}`);
+      return;
+    }
+    if (group.password) {
+      setShowPassModal(group);
+      return;
+    }
+    await realizarEntrada(group.id, group.members);
+  };
+
+  const realizarEntrada = async (chatId, currentMembers) => {
+    const chatRef = doc(db, "chats", chatId);
+    await updateDoc(chatRef, { members: [...currentMembers, user.uid] });
+    router.push(`/chat/${chatId}`);
+  };
+
+  const validarSenhaEEntrar = async () => {
+    if (inputPass === showPassModal.password) {
+      await realizarEntrada(showPassModal.id, showPassModal.members);
+    } else {
+      alert("ACESSO NEGADO: CHAVE INCORRETA");
     }
   };
 
   const criarGrupoComSenha = async () => {
-    if (!groupName || !groupPassword || selectedUsers.length === 0) return;
-    const chatRef = await addDoc(collection(db, "chats"), {
+    if (!groupName || !groupPassword) return;
+    await addDoc(collection(db, "chats"), {
       isGroup: true,
       name: groupName,
       password: groupPassword,
       members: [user.uid],
       admins: [user.uid],
       createdAt: serverTimestamp(),
+      lastMessage: "SISTEMA: CANAL INICIALIZADO",
     });
-    for (const uid of selectedUsers) {
-      await addDoc(collection(db, "groupInvites"), {
-        chatId: chatRef.id,
-        groupName,
-        from: user.uid,
-        to: uid,
-        status: "pending",
-        createdAt: serverTimestamp(),
-      });
-    }
     setShowGroupModal(false);
     setGroupName("");
     setGroupPassword("");
-    setSelectedUsers([]);
   };
 
+  const meusGrupos = allGroups.filter(g => g.members?.includes(user?.uid));
+  const descobertaGrupos = allGroups.filter(g => !g.members?.includes(user?.uid));
+
   return (
-    <div className="h-screen flex flex-col font-sans text-white overflow-hidden bg-[#050505] relative">
+    <div className="h-screen flex flex-col bg-[#050505] text-zinc-100 overflow-hidden font-mono selection:bg-white selection:text-black">
       
-      {/* Background de Partículas */}
-      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none opacity-40">
-        {[...Array(20)].map((_, i) => (
-          <div key={i} className="particle" style={{
-            left: `${Math.random() * 100}%`,
-            top: `${Math.random() * 100}%`,
-            width: `2px`,
-            height: `2px`,
-            animationDuration: `${15 + Math.random() * 10}s`
-          }}></div>
-        ))}
+      {/* BARRA DE STATUS DECORATIVA (TOPO) */}
+      <div className="h-6 bg-white flex items-center px-4 justify-between overflow-hidden">
+        <div className="flex gap-4 items-center">
+          <span className="text-[9px] font-black text-black animate-pulse">● LIVE_SYSTEM_FEED</span>
+          <span className="text-[9px] font-bold text-black opacity-60">ID: {user?.uid?.slice(0,8)}</span>
+        </div>
+        <div className="hidden md:flex gap-6 items-center">
+          <span className="text-[9px] font-bold text-black tracking-widest uppercase">Encryption: AES-256-GCM</span>
+          <span className="text-[9px] font-bold text-black uppercase tracking-widest text-right">Node: BRA_FOR_08</span>
+        </div>
       </div>
 
-      {/* Header Responsivo */}
-      <header className="relative z-10 flex flex-col sm:flex-row justify-between items-center px-6 py-6 sm:px-10 sm:py-8 bg-black/40 backdrop-blur-2xl border-b border-white/5 gap-4">
-        <div className="flex flex-col items-center sm:items-start text-center sm:text-left">
-          <div className="flex flex-wrap justify-center sm:justify-start items-center gap-3">
-             <h1 className="text-2xl sm:text-3xl font-black tracking-tighter uppercase">SkyChat</h1>
-             <span className="bg-emerald-500/10 text-emerald-400 text-[8px] sm:text-[9px] font-bold px-2 py-0.5 rounded-full border border-emerald-500/20 uppercase tracking-widest">Seguro & Profissional</span>
-          </div>
-          <p className="text-[8px] sm:text-[9px] text-gray-500 font-mono mt-1 tracking-[0.2em] uppercase">Status: Em Desenvolvimento v1.0.4-dev</p>
+      {/* HEADER PRINCIPAL */}
+      <header className="px-6 py-8 md:px-12 border-b border-white/10 bg-black flex flex-col md:flex-row justify-between items-center gap-8 z-50">
+        <div className="flex flex-col items-center md:items-start">
+          <h1 className="text-4xl font-black tracking-tighter uppercase leading-none italic">
+            SKY<span className="text-zinc-500">CHAT</span>
+          </h1>
+          <p className="text-[8px] mt-2 text-zinc-600 tracking-[0.5em] uppercase font-bold">Protocolo de Comunicação Segura</p>
         </div>
 
-        <button
+        <nav className="flex items-center gap-2 bg-zinc-950 p-1.5 rounded-2xl border border-white/5">
+          <button 
+            onClick={() => setActiveTab("meus")}
+            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'meus' ? 'bg-white text-black' : 'text-zinc-600 hover:text-white'}`}
+          >
+            <FiCpu /> Meus Canais
+          </button>
+          <button 
+            onClick={() => setActiveTab("descoberta")}
+            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'descoberta' ? 'bg-white text-black' : 'text-zinc-600 hover:text-white'}`}
+          >
+            <FiGlobe /> Explorar
+          </button>
+        </nav>
+
+        <button 
           onClick={() => setShowGroupModal(true)}
-          className="w-full sm:w-auto group relative flex items-center justify-center gap-2 bg-white text-black px-8 py-3 rounded-xl font-black text-xs hover:scale-105 active:scale-95 transition-all shadow-[0_0_30px_rgba(255,255,255,0.15)] uppercase"
+          className="group flex items-center gap-3 bg-zinc-900 border border-white/10 text-white px-8 py-4 rounded-full font-black text-[10px] transition-all hover:bg-white hover:text-black uppercase tracking-widest"
         >
-          Novo Canal +
+          <FiPlus className="group-hover:rotate-90 transition-transform" /> Criar Canal
         </button>
       </header>
 
-      {/* Área Principal */}
-      <main className="relative z-10 flex-1 overflow-y-auto p-4 sm:p-8 lg:px-20 space-y-8 custom-scrollbar">
+      {/* ÁREA DE CONTEÚDO */}
+      <main className="flex-1 overflow-y-auto p-6 md:p-12 custom-scrollbar">
         
-        {/* Banner Sutil Mobile-Friendly */}
-        <div className="w-full py-2 bg-gradient-to-r from-transparent via-white/5 to-transparent flex justify-center border-y border-white/5">
-           <p className="text-[8px] sm:text-[10px] text-gray-500 font-medium tracking-widest text-center px-4">CRIPTOGRAFIA ATIVADA • AMBIENTE SEGURO</p>
+        {/* TEXTO DECORATIVO DE FUNDO */}
+        <div className="mb-8 flex flex-wrap gap-4 items-center border-l-2 border-white/10 pl-6 py-2">
+           <div className="flex flex-col">
+              <span className="text-[9px] text-zinc-600 font-bold uppercase tracking-widest">Acesso Global</span>
+              <span className="text-xs font-black">{allGroups.length} Frequências</span>
+           </div>
+           <div className="h-4 w-px bg-white/10 mx-4" />
+           <div className="flex flex-col">
+              <span className="text-[9px] text-zinc-600 font-bold uppercase tracking-widest">Usuários</span>
+              <span className="text-xs font-black">{usersCount} Conectados</span>
+           </div>
+           <div className="ml-auto hidden lg:block">
+              <p className="text-[9px] text-zinc-700 italic max-w-xs text-right leading-tight">
+                "O silêncio é uma virtude, mas a comunicação é uma arma. Use seu acesso com sabedoria."
+              </p>
+           </div>
         </div>
 
-        {/* Convites - Ajustado para Grade */}
-        {invites.length > 0 && (
-          <div className="animate-in fade-in slide-in-from-top-4 duration-500">
-            <h2 className="text-[9px] font-black text-emerald-500 uppercase tracking-[0.3em] mb-4 ml-2">Solicitações</h2>
-            <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-              {invites.map((invite) => (
-                <div key={invite.id} className="bg-emerald-500/5 border border-emerald-500/20 rounded-2xl p-5 flex flex-col gap-4 backdrop-blur-md">
-                  <div>
-                    <p className="text-sm font-bold text-emerald-200 truncate">{invite.groupName}</p>
-                    <p className="text-[9px] text-emerald-500/60 font-mono mt-1 uppercase">Acesso Pendente</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <AnimatePresence mode="popLayout">
+            {(activeTab === "meus" ? meusGrupos : descobertaGrupos).map((group) => (
+              <motion.div
+                layout
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                key={group.id}
+                onClick={() => entrarNoGrupo(group)}
+                className="group relative bg-[#0a0a0a] border border-white/5 p-6 rounded-3xl cursor-pointer hover:border-white/40 transition-all duration-300"
+              >
+                <div className="flex justify-between items-start mb-6">
+                  <div className={`p-3 rounded-2xl bg-zinc-900 border border-white/5 group-hover:bg-white group-hover:text-black transition-all`}>
+                    <FiTerminal size={18} />
                   </div>
-                  <button
-                    onClick={() => aceitarGrupo(invite)}
-                    className="w-full bg-emerald-500 text-black text-[10px] font-black py-2.5 rounded-lg hover:bg-emerald-400 transition-all uppercase"
-                  >
-                    Ingressar
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Lista de Chats - Cards Otimizados */}
-        <div className="space-y-4">
-          <div className="flex justify-between items-center px-2">
-            <h2 className="text-[9px] font-black text-gray-500 uppercase tracking-[0.3em]">Canais Ativos</h2>
-            <span className="text-[9px] text-gray-700 font-bold uppercase">{chats.length} Online</span>
-          </div>
-
-          <div className="grid gap-3 grid-cols-1 md:grid-cols-2 2xl:grid-cols-3">
-            {chats.length === 0 ? (
-              <div className="col-span-full py-16 flex flex-col items-center opacity-20 grayscale px-4">
-                <div className="w-16 h-16 rounded-full border border-dashed border-white flex items-center justify-center mb-4 text-xl">⌬</div>
-                <p className="text-[10px] font-mono uppercase tracking-widest text-center">Nenhum canal de rádio detectado.</p>
-              </div>
-            ) : (
-              chats.map((chat) => (
-                <div
-                  key={chat.id}
-                  onClick={() => router.push(`/chat/${chat.id}`)}
-                  className="group flex items-center gap-4 bg-gradient-to-r from-white/5 to-transparent border border-white/5 p-4 sm:p-5 rounded-2xl sm:rounded-[2rem] cursor-pointer hover:bg-white/[0.08] hover:border-white/20 transition-all duration-300 shadow-xl active:scale-[0.98]"
-                >
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-black border border-white/10 flex flex-shrink-0 items-center justify-center text-xl shadow-2xl group-hover:bg-white group-hover:text-black transition-all">
-                    {chat.isGroup ? "⧉" : "⌬"}
-                  </div>
-                  
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <h3 className="font-bold text-sm sm:text-base tracking-tight truncate">{chat.name || "Chat Privado"}</h3>
-                    </div>
-                    <p className="text-[11px] text-gray-500 truncate font-light">
-                      {chat.lastMessage || "Nenhuma transmissão..."}
-                    </p>
-                  </div>
-
-                  <div className="flex-shrink-0 flex flex-col items-end gap-1">
-                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_#10b981]"></div>
-                    <span className="text-[8px] font-mono text-gray-700 uppercase hidden sm:block">ID: {chat.id.slice(0,4)}</span>
+                  <div className="text-right">
+                    <p className="text-[8px] font-black text-zinc-700 uppercase tracking-widest mb-1">Status</p>
+                    <span className="flex items-center gap-1 text-[9px] font-bold text-emerald-500 uppercase tracking-widest">
+                       Online <div className="h-1 w-1 bg-emerald-500 rounded-full animate-ping" />
+                    </span>
                   </div>
                 </div>
-              ))
-            )}
-          </div>
+
+                <h3 className="text-lg font-black uppercase tracking-tighter truncate mb-2">{group.name}</h3>
+                
+                <div className="flex flex-wrap gap-3 mb-6">
+                  <span className="px-2 py-1 rounded-md bg-zinc-900 border border-white/5 text-[9px] font-bold text-zinc-500 flex items-center gap-1 uppercase">
+                    <FiUsers size={10} /> {group.members?.length || 0}
+                  </span>
+                  <span className="px-2 py-1 rounded-md bg-zinc-900 border border-white/5 text-[9px] font-bold text-zinc-500 flex items-center gap-1 uppercase tracking-widest">
+                    {group.password ? <><FiLock size={10} /> Keys</> : <><FiUnlock size={10} /> Open</>}
+                  </span>
+                </div>
+
+                <div className="pt-4 border-t border-white/5 flex flex-col gap-1">
+                  <span className="text-[8px] font-black text-zinc-700 uppercase tracking-widest">Última Transmissão</span>
+                  <p className="text-[10px] text-zinc-500 truncate italic">
+                    {group.lastMessage || "Sinal ausente..."}
+                  </p>
+                </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
         </div>
       </main>
 
-      {/* Modal - Ajustado para Mobile */}
-      {showGroupModal && (
-        <div className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-end sm:items-center justify-center z-50 p-0 sm:p-6 animate-in fade-in duration-300">
-          <div className="bg-[#0f0f0f] border-t sm:border border-white/10 rounded-t-[2.5rem] sm:rounded-[3rem] p-8 w-full max-w-lg shadow-2xl overflow-y-auto max-h-[90vh] custom-scrollbar">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-black uppercase tracking-tight">Novo Canal</h2>
-              <button onClick={() => setShowGroupModal(false)} className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-xl hover:bg-white/10 transition">×</button>
-            </div>
-            
-            <div className="space-y-4 pb-8 sm:pb-0">
-              <input
-                placeholder="NOME DO CANAL"
-                value={groupName}
-                onChange={(e) => setGroupName(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 px-6 py-4 rounded-xl focus:bg-white/10 outline-none text-[10px] font-bold tracking-widest uppercase"
-              />
-              <input
-                placeholder="SENHA (KEYS)"
-                value={groupPassword}
-                onChange={(e) => setGroupPassword(e.target.value)}
-                type="password"
-                className="w-full bg-white/5 border border-white/10 px-6 py-4 rounded-xl focus:bg-white/10 outline-none text-[10px] font-bold tracking-widest uppercase"
-              />
-              
-              <div className="bg-black/40 rounded-2xl p-4 border border-white/5">
-                <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest mb-4">Membros Disponíveis</p>
-                <div className="max-h-40 overflow-y-auto space-y-1 pr-2 custom-scrollbar">
-                  {users.map((u) => (
-                    <label key={u.id} className="flex items-center justify-between p-3 bg-white/5 rounded-xl hover:bg-white/10 cursor-pointer border border-transparent">
-                      <div className="flex items-center gap-3">
-                         <img src={u.avatar} className="w-6 h-6 rounded-full grayscale border border-white/10" />
-                         <span className="text-[10px] font-bold text-gray-400">{u.nome}</span>
-                      </div>
-                      <input
-                        type="checkbox"
-                        className="w-4 h-4 accent-white"
-                        onChange={(e) =>
-                          setSelectedUsers((prev) =>
-                            e.target.checked ? [...prev, u.id] : prev.filter((id) => id !== u.id)
-                          )
-                        }
-                      />
-                    </label>
-                  ))}
-                </div>
+      {/* FOOTER DECORATIVO */}
+      <footer className="h-10 bg-zinc-950 border-t border-white/5 flex items-center justify-between px-6">
+        <span className="text-[8px] text-zinc-700 font-bold uppercase tracking-[0.3em]">SkyChat Infrastructure v1.0.4-dev</span>
+        <div className="flex gap-4">
+           <div className="h-2 w-2 rounded-full bg-zinc-800" />
+           <div className="h-2 w-2 rounded-full bg-zinc-800" />
+           <div className="h-2 w-2 rounded-full bg-emerald-500" />
+        </div>
+      </footer>
+
+      {/* MODAL CRIAR CANAL */}
+      <AnimatePresence>
+        {showGroupModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/95 backdrop-blur-sm">
+            <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }}
+              className="bg-[#0a0a0a] border border-white/10 w-full max-w-md p-10 rounded-[3rem] shadow-2xl"
+            >
+              <div className="flex justify-between items-center mb-10">
+                <h2 className="text-2xl font-black uppercase tracking-tighter italic">Novo Canal</h2>
+                <button onClick={() => setShowGroupModal(false)} className="p-2 hover:bg-white/5 rounded-full transition-colors"><FiX size={24} /></button>
               </div>
 
-              <button
-                onClick={criarGrupoComSenha}
-                className="w-full bg-white text-black py-4 rounded-xl font-black text-[10px] hover:bg-gray-200 transition-all uppercase tracking-widest active:scale-95 shadow-xl"
-              >
-                Inicializar Canal
-              </button>
-            </div>
+              <div className="space-y-6">
+                <div>
+                  <p className="text-[9px] font-black text-zinc-600 mb-2 uppercase tracking-widest">Identificador da Frequência</p>
+                  <input value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder="NOME_DO_CANAL" className="w-full bg-zinc-900 border border-white/5 p-4 rounded-2xl outline-none focus:border-white transition-all font-black uppercase text-xs" />
+                </div>
+                
+                <div>
+                  <p className="text-[9px] font-black text-zinc-600 mb-2 uppercase tracking-widest">Chave de Encriptação</p>
+                  <input type="password" value={groupPassword} onChange={(e) => setGroupPassword(e.target.value)} placeholder="••••••••" className="w-full bg-zinc-900 border border-white/5 p-4 rounded-2xl outline-none focus:border-white transition-all font-black text-xs" />
+                </div>
+
+                <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
+                   <p className="text-[8px] text-zinc-500 font-bold leading-normal uppercase">
+                     Atenção: Todos os canais criados são registrados no diretório global. Use nomes que permitam identificação por outros agentes ou mantenha a chave em segredo.
+                   </p>
+                </div>
+
+                <button onClick={criarGrupoComSenha} className="w-full bg-white text-black py-5 rounded-2xl font-black uppercase text-[10px] tracking-[0.3em] hover:scale-[1.02] active:scale-95 transition-all">
+                  Inicializar Protocolo
+                </button>
+              </div>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
+
+      {/* MODAL SENHA */}
+      <AnimatePresence>
+        {showPassModal && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/98 backdrop-blur-md">
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-zinc-950 border border-red-500/20 w-full max-w-xs p-10 rounded-[2.5rem] text-center"
+            >
+              <FiShield size={32} className="mx-auto mb-6 text-red-500" />
+              <h2 className="text-xs font-black uppercase tracking-widest mb-2 italic">Acesso Restrito</h2>
+              <p className="text-[9px] text-zinc-600 uppercase mb-8 font-bold tracking-tighter">O canal {showPassModal.name} exige autenticação</p>
+              
+              <input 
+                autoFocus
+                type="password" 
+                value={inputPass} 
+                onChange={(e) => setInputPass(e.target.value)}
+                placeholder="KEY_ACCESS"
+                className="w-full bg-zinc-900 border border-white/10 p-4 rounded-xl outline-none mb-4 text-center font-black tracking-widest"
+              />
+
+              <div className="flex flex-col gap-2">
+                <button onClick={validarSenhaEEntrar} className="w-full bg-white text-black py-4 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-500 hover:text-white transition-all">Validar</button>
+                <button onClick={() => setShowPassModal(null)} className="w-full py-4 text-[9px] font-black uppercase text-zinc-700">Abortar</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <style jsx global>{`
-        .particle { position: absolute; background: white; border-radius: 50%; animation: float 15s infinite linear; opacity: 0.2; }
-        @keyframes float { 0% { transform: translateY(0); opacity: 0; } 50% { opacity: 0.3; } 100% { transform: translateY(-100vh); opacity: 0; } }
-        .custom-scrollbar::-webkit-scrollbar { width: 3px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.05); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar { width: 2px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); }
       `}</style>
     </div>
   );

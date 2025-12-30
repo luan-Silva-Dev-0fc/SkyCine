@@ -12,15 +12,27 @@ import {
   onSnapshot,
   query,
   orderBy,
-  getDoc,
   getDocs,
   updateDoc,
   serverTimestamp,
   setDoc,
-  deleteDoc
+  deleteDoc,
 } from "firebase/firestore";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  FiSend,
+  FiTrash2,
+  FiX,
+  FiSlash,
+  FiShield,
+  FiCheck,
+  FiAlertTriangle,
+  FiInfo,
+  FiSettings,
+  FiEye,
+  FiEyeOff,
+} from "react-icons/fi";
 
-// Configuração MANTIDA
 const firebaseConfig = {
   apiKey: "AIzaSyDz6mdcZQ_Z3815u50nJCjqy4GEOyndn5k",
   authDomain: "skycine-c59b0.firebaseapp.com",
@@ -36,17 +48,41 @@ export default function ChatRoom() {
   const { chatId } = router.query;
 
   const [user, setUser] = useState(null);
-  const [chat, setChat] = useState(null);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [allUsers, setAllUsers] = useState([]);
-  const [mutedUsers, setMutedUsers] = useState([]);
+  const [chatData, setChatData] = useState(null);
+  const [showPrivacyNotice, setShowPrivacyNotice] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
+
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [selectedMsg, setSelectedMsg] = useState(null);
+  const [activePoll, setActivePoll] = useState(null);
   const [typingUsers, setTypingUsers] = useState([]);
-  const [replyTo, setReplyTo] = useState(null);
-  const [activeMenu, setActiveMenu] = useState(null); // Para o menu do avatar
+
+  const [privacy, setPrivacy] = useState({
+    showOnline: true,
+    showTyping: true,
+  });
+
+  const [mutedUsers, setMutedUsers] = useState([]);
+  const [blockedUsers, setBlockedUsers] = useState([]);
   const messagesEndRef = useRef();
 
-  const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  useEffect(() => {
+    const savedMuted = localStorage.getItem("sky_muted");
+    const savedBlocked = localStorage.getItem("sky_blocked");
+    const savedPrivacy = localStorage.getItem("sky_privacy");
+    if (savedMuted) setMutedUsers(JSON.parse(savedMuted));
+    if (savedBlocked) setBlockedUsers(JSON.parse(savedBlocked));
+    if (savedPrivacy) setPrivacy(JSON.parse(savedPrivacy));
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("sky_muted", JSON.stringify(mutedUsers));
+    localStorage.setItem("sky_blocked", JSON.stringify(blockedUsers));
+    localStorage.setItem("sky_privacy", JSON.stringify(privacy));
+  }, [mutedUsers, blockedUsers, privacy]);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
@@ -54,148 +90,193 @@ export default function ChatRoom() {
       setUser(u);
       if (!chatId) return;
 
-      // Monitorar Mensagens
-      const msgQuery = query(collection(db, "chats", chatId, "messages"), orderBy("createdAt"));
+      onSnapshot(doc(db, "chats", chatId), (snap) => setChatData(snap.data()));
+
+      const msgQuery = query(
+        collection(db, "chats", chatId, "messages"),
+        orderBy("createdAt")
+      );
       onSnapshot(msgQuery, (snap) => {
         setMessages(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-        setTimeout(scrollToBottom, 100);
+        setTimeout(
+          () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }),
+          100
+        );
       });
 
-      // Monitorar Quem está digitando
       const typingQuery = collection(db, "chats", chatId, "typing");
       onSnapshot(typingQuery, (snap) => {
-        setTypingUsers(snap.docs.map(d => d.data()).filter(t => t.userId !== u.uid));
+        setTypingUsers(
+          snap.docs.map((d) => d.data()).filter((t) => t.userId !== u.uid)
+        );
       });
 
-      // Carregar Usuários
+      const pollQuery = query(collection(db, "chats", chatId, "polls"));
+      onSnapshot(pollQuery, (snap) => {
+        const poll = snap.docs[0];
+        if (poll) setActivePoll({ id: poll.id, ...poll.data() });
+        else setActivePoll(null);
+      });
+
       const usersSnap = await getDocs(collection(db, "users"));
-      setAllUsers(usersSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setAllUsers(usersSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
     return () => unsub();
-  }, [chatId]);
+  }, [chatId, router]);
 
-  // Função para indicar que está digitando
   const handleTyping = async (e) => {
     setText(e.target.value);
-    if (!user || !chatId) return;
-    
+    if (!user || !chatId || !privacy.showTyping) return;
     const typingRef = doc(db, "chats", chatId, "typing", user.uid);
     if (e.target.value.length > 0) {
-      await setDoc(typingRef, { userId: user.uid, nome: user.displayName || "Alguém", timestamp: Date.now() });
+      await setDoc(typingRef, {
+        userId: user.uid,
+        nome: user.displayName || "Agente",
+      });
       setTimeout(async () => await deleteDoc(typingRef), 3000);
     } else {
       await deleteDoc(typingRef);
     }
   };
 
-  const sendMessage = async () => {
-    if (!text.trim()) return;
-    await addDoc(collection(db, "chats", chatId, "messages"), {
-      senderId: user.uid,
-      text,
-      replyTo: replyTo ? { text: replyTo.text, senderName: replyTo.senderName } : null,
-      createdAt: serverTimestamp(),
-      isDeleted: false
-    });
-    setText("");
-    setReplyTo(null);
+  const deletePermanent = async (e, msgId) => {
+    e.stopPropagation();
+    await deleteDoc(doc(db, "chats", chatId, "messages", msgId));
+    setSelectedMsg(null);
   };
 
-  const deleteMessage = async (msgId) => {
-    // Atualiza para deletado e remove o texto original do banco para privacidade total
-    await updateDoc(doc(db, "chats", chatId, "messages", msgId), {
-      isDeleted: true,
-      text: "Esta mensagem foi removida e os dados foram apagados permanentemente dos nossos servidores.",
-      originalText: null 
+  const iniciarVotoBan = async (targetId) => {
+    if (activePoll) return;
+    const target = allUsers.find((u) => u.id === targetId);
+    await addDoc(collection(db, "chats", chatId, "polls"), {
+      targetId,
+      targetName: target?.nome || "Agente",
+      votes: { [user.uid]: "sim" },
+      totalMembers: chatData.members.length,
     });
+    setSelectedUser(null);
+  };
+
+  const votar = async (voto) => {
+    const pollRef = doc(db, "chats", chatId, "polls", activePoll.id);
+    if (voto === "nao") return await deleteDoc(pollRef);
+    const novasVotos = { ...activePoll.votes, [user.uid]: voto };
+    const totalSim = Object.values(novasVotos).filter(
+      (v) => v === "sim"
+    ).length;
+    if (totalSim >= activePoll.totalMembers - 1) {
+      await updateDoc(doc(db, "chats", chatId), {
+        members: chatData.members.filter((m) => m !== activePoll.targetId),
+      });
+      await deleteDoc(pollRef);
+    } else {
+      await updateDoc(pollRef, { votes: novasVotos });
+    }
   };
 
   return (
-    <div className="h-screen flex flex-col text-white font-sans overflow-hidden bg-[#0a0a0a] relative">
-      
-      {/* Background de Partículas Tecnológicas */}
-      <div className="absolute inset-0 z-0 pointer-events-none opacity-40">
-        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
-        <div className="particles-container">
-           {[...Array(20)].map((_, i) => (
-             <div key={i} className="particle" style={{
-               left: `${Math.random() * 100}%`,
-               top: `${Math.random() * 100}%`,
-               animationDelay: `${Math.random() * 5}s`
-             }}></div>
-           ))}
-        </div>
-      </div>
+    <div className="h-screen flex flex-col bg-[#020202] text-white font-mono relative overflow-hidden">
+      <div className="absolute inset-0 z-0 bg-gradient-to-b from-[#1d1d1d] to-[#020202] opacity-50" />
 
-      {/* Header Glassmorphism */}
-      <header className="h-20 flex items-center justify-between px-8 bg-black/40 backdrop-blur-xl border-b border-white/5 z-20">
-        <div className="flex items-center gap-4">
-          <h1 className="text-xl font-black tracking-widest text-white">SKY<span className="text-gray-500">CHAT</span></h1>
-          <div className="h-4 w-[1px] bg-white/10"></div>
+      <AnimatePresence>
+        {showPrivacyNotice && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[300] bg-black/98 flex items-center justify-center p-6 backdrop-blur-xl"
+          >
+            <div className="max-w-md bg-zinc-950 border border-white/10 p-8 rounded-[2.5rem] text-center">
+              <FiShield size={40} className="mx-auto mb-6" />
+              <h2 className="text-lg font-black uppercase mb-4 italic tracking-tighter">
+                SkyChat Privacy
+              </h2>
+              <p className="text-[10px] text-zinc-400 leading-relaxed uppercase font-bold text-justify mb-8">
+                Qualquer pessoa pode usar este canal. O banco de dados deleta as
+                mensagens permanentemente sem retorno em caso de exclusão. Em
+                caso de problemas judiciais, não teremos responsabilidade. Não
+                iremos e não colaboraremos com autoridades armazenando ou
+                exportando dados eliminados.
+              </p>
+              <button
+                onClick={() => setShowPrivacyNotice(false)}
+                className="w-full py-5 bg-white text-black font-black rounded-2xl uppercase text-xs"
+              >
+                ACEITAR TERMOS
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <header className="h-20 flex items-center justify-between px-6 bg-black/80 border-b border-white/5 z-50 fixed top-0 w-full backdrop-blur-lg">
+        <div>
+          <h1 className="text-xl font-black italic tracking-tighter uppercase leading-none">
+            SkyChat
+          </h1>
           {typingUsers.length > 0 && (
-            <span className="text-[10px] text-emerald-400 font-mono animate-pulse uppercase tracking-tighter">
-              {typingUsers[0].nome} está digitando...
+            <span className="text-[9px] text-emerald-500 animate-pulse font-bold">
+              DIGITANDO...
             </span>
           )}
         </div>
+        <div className="flex items-center gap-4">
+          <FiSettings
+            className="text-zinc-500 text-xl cursor-pointer"
+            onClick={() => setShowSettings(true)}
+          />
+          <div className="h-3 w-3 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_#10b981]" />
+        </div>
       </header>
 
-      {/* Feed de Mensagens */}
-      <main className="flex-1 overflow-y-auto p-6 space-y-6 z-10 custom-scrollbar">
+      <main className="flex-1 overflow-y-auto pt-24 pb-28 px-4 md:px-20 space-y-6 z-10 custom-scrollbar">
         {messages.map((m) => {
-          if (mutedUsers.includes(m.senderId)) return null;
           const isMe = m.senderId === user?.uid;
-          const sender = allUsers.find(u => u.id === m.senderId);
+          if (
+            mutedUsers.includes(m.senderId) ||
+            blockedUsers.includes(m.senderId)
+          )
+            return null;
+          const sender = allUsers.find((u) => u.id === m.senderId);
 
           return (
-            <div key={m.id} className={`flex gap-4 ${isMe ? "flex-row-reverse" : "flex-row"} animate-in fade-in duration-500`}>
-              
-              {/* Avatar com Menu de Opções */}
-              <div className="relative flex-shrink-0">
-                <img 
-                  src={sender?.avatar || "https://i.pinimg.com/736x/0a/db/6b/0adb6bd452807b8c821c8e66cd104a23.jpg"} 
-                  className={`w-10 h-10 rounded-full border border-white/10 cursor-pointer hover:scale-110 transition-all ${activeMenu === m.id ? 'ring-2 ring-white' : ''}`}
-                  onClick={() => setActiveMenu(activeMenu === m.id ? null : m.id)}
-                />
-                
-                {activeMenu === m.id && !isMe && (
-                  <div className="absolute top-12 left-0 w-40 bg-gray-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in zoom-in-95 duration-200">
-                    <button onClick={() => { setMutedUsers([...mutedUsers, m.senderId]); setActiveMenu(null); }} className="w-full text-left px-4 py-3 text-xs hover:bg-white/5 transition border-b border-white/5">🔇 Silenciar</button>
-                    <button className="w-full text-left px-4 py-3 text-xs hover:bg-white/5 transition border-b border-white/5 text-orange-400">🚫 Bloquear</button>
-                    <button className="w-full text-left px-4 py-3 text-xs hover:bg-white/5 transition text-red-500">⚠️ Denunciar</button>
-                  </div>
-                )}
-              </div>
-
-              <div className={`flex flex-col max-w-[75%] ${isMe ? "items-end" : "items-start"}`}>
-                {/* Resposta (Reply) */}
-                {m.replyTo && (
-                  <div className="bg-white/5 border-l-2 border-white/20 p-2 mb-[-10px] rounded-t-xl text-[10px] opacity-60 italic">
-                    Respondendo a {m.replyTo.senderName}: {m.replyTo.text.slice(0, 30)}...
-                  </div>
-                )}
-
-                <div 
-                  onClick={() => !m.isDeleted && setReplyTo({ text: m.text, senderName: sender?.nome || "Usuário" })}
-                  className={`
-                    px-5 py-3 rounded-3xl text-sm transition-all cursor-pointer relative group
-                    ${m.isDeleted ? "bg-red-500/10 border border-red-500/20 text-red-300 italic text-xs" : 
-                      isMe ? "bg-white text-black font-medium rounded-tr-none shadow-[0_10px_30px_rgba(255,255,255,0.05)]" : 
-                      "bg-gray-800/80 backdrop-blur-md text-gray-100 rounded-tl-none border border-white/5 hover:bg-gray-700"}
-                  `}
-                >
-                  {m.text}
-                  
-                  {isMe && !m.isDeleted && (
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); deleteMessage(m.id); }}
-                      className="absolute -left-8 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-2 text-red-500 hover:scale-125 transition-all"
-                    >
-                      ✕
-                    </button>
+            <div
+              key={m.id}
+              className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}
+            >
+              <div
+                className={`flex items-end gap-3 max-w-[90%] md:max-w-[70%] ${
+                  isMe ? "flex-row-reverse" : "flex-row"
+                }`}
+              >
+                <div className="relative">
+                  <img
+                    onClick={() =>
+                      !isMe &&
+                      setSelectedUser(
+                        sender || { id: m.senderId, nome: "Agente" }
+                      )
+                    }
+                    src={
+                      sender?.avatar ||
+                      `https://api.dicebear.com/7.x/identicon/svg?seed=${m.senderId}`
+                    }
+                    className="w-10 h-10 rounded-xl border border-white/10 cursor-pointer"
+                  />
+                  {privacy.showOnline && (
+                    <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-black" />
                   )}
                 </div>
-                <span className="text-[8px] font-bold text-gray-600 uppercase mt-1 px-1 tracking-widest">{sender?.nome}</span>
+                <div
+                  onClick={() => isMe && setSelectedMsg(m)}
+                  className={`p-4 rounded-2xl text-sm border shadow-2xl transition-all cursor-pointer ${
+                    isMe
+                      ? "bg-white text-black font-bold border-white rounded-tr-none"
+                      : "bg-zinc-900/90 border-white/5 rounded-tl-none"
+                  }`}
+                >
+                  {m.text}
+                </div>
               </div>
             </div>
           );
@@ -203,51 +284,183 @@ export default function ChatRoom() {
         <div ref={messagesEndRef} />
       </main>
 
-      {/* Barra de Resposta Ativa */}
-      {replyTo && (
-        <div className="mx-6 p-3 bg-white/5 border border-white/10 rounded-t-2xl flex justify-between items-center animate-in slide-in-from-bottom-2">
-           <p className="text-[10px] text-gray-400">Respondendo <b>{replyTo.senderName}</b>: {replyTo.text.slice(0, 40)}...</p>
-           <button onClick={() => setReplyTo(null)} className="text-white text-xs px-2">✕</button>
-        </div>
-      )}
+      <AnimatePresence>
+        {showSettings && (
+          <div className="fixed inset-0 z-[250] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl">
+            <motion.div
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              className="bg-zinc-950 border border-white/10 p-8 rounded-[2.5rem] w-full max-w-sm"
+            >
+              <h2 className="text-xl font-black uppercase mb-8 tracking-tighter italic text-center">
+                Configurações
+              </h2>
+              <div className="space-y-4">
+                <button
+                  onClick={() =>
+                    setPrivacy((p) => ({ ...p, showOnline: !p.showOnline }))
+                  }
+                  className="w-full flex justify-between items-center p-5 bg-white/5 rounded-2xl border border-white/5"
+                >
+                  <span className="text-xs font-bold uppercase">
+                    Status Online
+                  </span>
+                  {privacy.showOnline ? (
+                    <FiEye className="text-emerald-500" />
+                  ) : (
+                    <FiEyeOff className="text-red-500" />
+                  )}
+                </button>
+                <button
+                  onClick={() =>
+                    setPrivacy((p) => ({ ...p, showTyping: !p.showTyping }))
+                  }
+                  className="w-full flex justify-between items-center p-5 bg-white/5 rounded-2xl border border-white/5"
+                >
+                  <span className="text-xs font-bold uppercase">
+                    Digitando em tempo real
+                  </span>
+                  {privacy.showTyping ? (
+                    <FiEye className="text-emerald-500" />
+                  ) : (
+                    <FiEyeOff className="text-red-500" />
+                  )}
+                </button>
+              </div>
+              <button
+                onClick={() => setShowSettings(false)}
+                className="w-full mt-8 py-5 bg-white text-black font-black rounded-2xl uppercase text-[10px]"
+              >
+                Fechar
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
-      {/* Input Tecnológico */}
-      <footer className="p-6 bg-gradient-to-t from-black to-transparent">
-        <div className="max-w-4xl mx-auto flex items-center gap-3 bg-white/5 border border-white/10 p-2 rounded-2xl shadow-2xl backdrop-blur-2xl">
+      <AnimatePresence>
+        {selectedUser && (
+          <div
+            className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/90"
+            onClick={() => setSelectedUser(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-zinc-950 border border-white/10 w-full max-w-xs p-8 rounded-[2.5rem] text-center"
+            >
+              <img
+                src={selectedUser.avatar}
+                className="w-20 h-20 mx-auto rounded-2xl mb-4"
+              />
+              <h2 className="text-sm font-black uppercase mb-8">
+                {selectedUser.nome}
+              </h2>
+              <div className="space-y-3">
+                <button
+                  onClick={() => {
+                    setMutedUsers([...mutedUsers, selectedUser.id]);
+                    setSelectedUser(null);
+                  }}
+                  className="w-full p-4 bg-zinc-900 rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2"
+                >
+                  Silenciar
+                </button>
+                <button
+                  onClick={() => {
+                    setBlockedUsers([...blockedUsers, selectedUser.id]);
+                    setSelectedUser(null);
+                  }}
+                  className="w-full p-4 bg-zinc-900 border border-red-500/20 rounded-2xl text-[10px] font-black uppercase text-red-500 flex items-center justify-center gap-2"
+                >
+                  Bloquear
+                </button>
+                <button
+                  onClick={() => iniciarVotoBan(selectedUser.id)}
+                  className="w-full p-4 bg-red-600 rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2"
+                >
+                  Votar Banimento
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {selectedMsg && (
+          <div
+            className="fixed inset-0 z-[250] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm"
+            onClick={() => setSelectedMsg(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-sm bg-zinc-950 border border-red-500/20 p-8 rounded-[2.5rem] text-center"
+            >
+              <FiTrash2 size={32} className="mx-auto mb-4 text-red-500" />
+              <h3 className="text-xs font-black uppercase mb-8">
+                Deletar do Banco?
+              </h3>
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={(e) => deletePermanent(e, selectedMsg.id)}
+                  className="w-full bg-red-600 p-5 rounded-2xl font-black uppercase text-[10px]"
+                >
+                  Excluir Permanente
+                </button>
+                <button
+                  onClick={() => setSelectedMsg(null)}
+                  className="w-full p-4 text-[10px] font-black uppercase text-zinc-600"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <footer className="fixed bottom-0 w-full p-6 bg-gradient-to-t from-black to-transparent z-40">
+        <div className="max-w-4xl mx-auto flex gap-2 bg-zinc-900 border border-white/10 p-2 rounded-2xl">
           <input
-            type="text"
             value={text}
             onChange={handleTyping}
-            onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-            placeholder="Digite sua mensagem segura..."
-            className="flex-1 bg-transparent px-6 py-3 outline-none text-sm placeholder:text-gray-700"
+            onKeyDown={(e) =>
+              e.key === "Enter" &&
+              text.trim() &&
+              addDoc(collection(db, "chats", chatId, "messages"), {
+                senderId: user.uid,
+                text,
+                createdAt: serverTimestamp(),
+              }).then(() => setText(""))
+            }
+            placeholder="MENSAGEM..."
+            className="flex-1 bg-transparent px-4 outline-none text-xs font-bold uppercase"
           />
           <button
-            onClick={sendMessage}
-            className="bg-white text-black h-12 px-6 rounded-xl font-black hover:bg-gray-200 transition-all active:scale-95 shadow-[0_0_15px_rgba(255,255,255,0.2)]"
+            onClick={() =>
+              text.trim() &&
+              addDoc(collection(db, "chats", chatId, "messages"), {
+                senderId: user.uid,
+                text,
+                createdAt: serverTimestamp(),
+              }).then(() => setText(""))
+            }
+            className="bg-white text-black h-12 w-12 flex items-center justify-center rounded-xl"
           >
-            ENVIAR
+            <FiSend />
           </button>
         </div>
       </footer>
-
       <style jsx global>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.05); border-radius: 10px; }
-        
-        .particle {
-          position: absolute;
-          width: 2px;
-          height: 2px;
-          background: white;
-          border-radius: 50%;
-          animation: float 10s infinite linear;
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 3px;
         }
-
-        @keyframes float {
-          0% { transform: translateY(0) rotate(0deg); opacity: 0; }
-          50% { opacity: 0.5; }
-          100% { transform: translateY(-100vh) rotate(360deg); opacity: 0; }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.1);
         }
       `}</style>
     </div>
