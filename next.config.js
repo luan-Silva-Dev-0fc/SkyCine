@@ -8,47 +8,38 @@ const withPWA = require('next-pwa')({
       handler: 'CacheFirst',
       options: {
         cacheName: 'static-chunks-cache',
-        expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 30 },
-      },
+        expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 30 }
+      }
     },
     {
       urlPattern: /_next\/static\/media\/.*\.(jpg|jpeg|png|svg|webp|gif)/,
       handler: 'CacheFirst',
       options: {
         cacheName: 'static-media-cache',
-        expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 * 30 },
-      },
+        expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 * 30 }
+      }
     },
     {
       urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
       handler: 'StaleWhileRevalidate',
       options: {
         cacheName: 'google-fonts-cache',
-        expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 * 365 },
-      },
+        expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 * 365 }
+      }
     },
     {
       urlPattern: /^https:\/\/fonts\.googleapis\.com\/css2\?family=.*/i,
       handler: 'StaleWhileRevalidate',
       options: {
         cacheName: 'google-fonts-css-cache',
-        expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 * 365 },
-      },
-    },
+        expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 * 365 }
+      }
+    }
   ],
-  disable: process.env.NODE_ENV === 'development',
+  disable: process.env.NODE_ENV === 'development'
 });
 
 module.exports = withPWA({
   reactStrictMode: true,
-
-  // Configuração correta para usar Webpack no Next.js 16+
-  experimental: {
-    turbo: false, // desativa Turbo/Turbopack corretamente
-  },
-
-  webpack: (config, { isServer }) => {
-    // mantém suas customizações do webpack, se houver
-    return config;
-  },
+  webpack: (config) => config
 });

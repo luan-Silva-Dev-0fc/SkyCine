@@ -1,1 +1,42 @@
-if(!self.define){let e,s={};const a=(a,i)=>(a=new URL(a+".js",i).href,s[a]||new Promise(s=>{if("document"in self){const e=document.createElement("script");e.src=a,e.onload=s,document.head.appendChild(e)}else e=a,importScripts(a),s()}).then(()=>{let e=s[a];if(!e)throw new Error(`Module ${a} didn’t register its module`);return e}));self.define=(i,n)=>{const c=e||("document"in self?document.currentScript.src:"")||location.href;if(s[c])return;let t={};const f=e=>a(e,c),r={module:{uri:c},exports:t,require:f};s[c]=Promise.all(i.map(e=>r[e]||f(e))).then(e=>(n(...e),t))}}define(["./workbox-14aa2a4a"],function(e){"use strict";importScripts(),self.skipWaiting(),e.clientsClaim(),e.precacheAndRoute([{url:"/_next/dynamic-css-manifest.json",revision:"d751713988987e9331980363e24189ce"},{url:"/_next/static/T9oClDiJupGZks5JjSP_n/_buildManifest.js",revision:"a50655bdf7f7dd3fd7170cf0a1a50860"},{url:"/_next/static/T9oClDiJupGZks5JjSP_n/_ssgManifest.js",revision:"b6652df95db52feb4daf4eca35380933"},{url:"/_next/static/chunks/0ed3bff5-eaa72a967ff8dab2.js",revision:"eaa72a967ff8dab2"},{url:"/_next/static/chunks/42-e5339f2a64296a22.js",revision:"e5339f2a64296a22"},{url:"/_next/static/chunks/439-ef238f1edfd62f6d.js",revision:"ef238f1edfd62f6d"},{url:"/_next/static/chunks/494.b9b55931a419d7a7.js",revision:"b9b55931a419d7a7"},{url:"/_next/static/chunks/763.db6ceecb248a03e0.js",revision:"db6ceecb248a03e0"},{url:"/_next/static/chunks/7eebee04-c722792b9e003ab8.js",revision:"c722792b9e003ab8"},{url:"/_next/static/chunks/ff393d78-5ad371988b242ecf.js",revision:"5ad371988b242ecf"},{url:"/_next/static/chunks/framework-40cb57ba376e14cb.js",revision:"40cb57ba376e14cb"},{url:"/_next/static/chunks/main-5bf2010ef4118b03.js",revision:"5bf2010ef4118b03"},{url:"/_next/static/chunks/pages/Home-5dc501b7c69ec528.js",revision:"5dc501b7c69ec528"},{url:"/_next/static/chunks/pages/Inicio-3db2ed92d33aafbf.js",revision:"3db2ed92d33aafbf"},{url:"/_next/static/chunks/pages/_app-520d87554bf7172b.js",revision:"520d87554bf7172b"},{url:"/_next/static/chunks/pages/_error-aee272889249d737.js",revision:"aee272889249d737"},{url:"/_next/static/chunks/pages/idfilmes-5912a4f6f2f669d3.js",revision:"5912a4f6f2f669d3"},{url:"/_next/static/chunks/pages/index-4623137bfd1526ec.js",revision:"4623137bfd1526ec"},{url:"/_next/static/chunks/pages/iptv-f11599131fc19363.js",revision:"f11599131fc19363"},{url:"/_next/static/chunks/polyfills-42372ed130431b0a.js",revision:"846118c33b2c0e922d7b3a7676f81f6f"},{url:"/_next/static/chunks/webpack-2e047170116fcc7c.js",revision:"2e047170116fcc7c"},{url:"/_next/static/css/3650517e0eceaf93.css",revision:"3650517e0eceaf93"},{url:"/animacao.svg",revision:"e1604cc874bda54e8ded18ab9e920482"},{url:"/animado.svg",revision:"cabf7e58f4934f3df1f60122e24d2370"},{url:"/favicon.ico",revision:"c30c7d42707a47a3f4591831641e50dc"},{url:"/file.svg",revision:"d09f95206c3fa0bb9bd9fefabfd0ea71"},{url:"/globe.svg",revision:"2aaafa6a49b6563925fe440891e32717"},{url:"/icon-192x192.png",revision:"618fb413ddb8891a938ffc1167ae553e"},{url:"/manifest.json",revision:"76622ca49378ed208604ed5147a5a823"},{url:"/next.svg",revision:"8e061864f388b47f33a1c3780831193e"},{url:"/planeta.svg",revision:"a52009aea6f9e18ed3d0487ab3a7f503"},{url:"/vercel.svg",revision:"c0af2f507b369b085b35ef4bbe3bcf1e"},{url:"/window.svg",revision:"a2760511c65806022ad20adf74370ff3"}],{ignoreURLParametersMatching:[]}),e.cleanupOutdatedCaches(),e.registerRoute("/",new e.NetworkFirst({cacheName:"start-url",plugins:[{cacheWillUpdate:async({request:e,response:s,event:a,state:i})=>s&&"opaqueredirect"===s.type?new Response(s.body,{status:200,statusText:"OK",headers:s.headers}):s}]}),"GET"),e.registerRoute(/_next\/static\/chunks\/.*\.(js|css)/,new e.CacheFirst({cacheName:"static-chunks-cache",plugins:[new e.ExpirationPlugin({maxEntries:100,maxAgeSeconds:2592e3})]}),"GET"),e.registerRoute(/_next\/static\/media\/.*\.(jpg|jpeg|png|svg|webp|gif)/,new e.CacheFirst({cacheName:"static-media-cache",plugins:[new e.ExpirationPlugin({maxEntries:50,maxAgeSeconds:2592e3})]}),"GET"),e.registerRoute(/^https:\/\/fonts\.googleapis\.com\/.*/i,new e.StaleWhileRevalidate({cacheName:"google-fonts-cache",plugins:[new e.ExpirationPlugin({maxEntries:50,maxAgeSeconds:31536e3})]}),"GET"),e.registerRoute(/^https:\/\/fonts\.googleapis\.com\/css2\?family=.*/i,new e.StaleWhileRevalidate({cacheName:"google-fonts-css-cache",plugins:[new e.ExpirationPlugin({maxEntries:50,maxAgeSeconds:31536e3})]}),"GET")});
+const CACHE_NAME = "skycine-cache-v1";
+const OFFLINE_URL = "/";
+
+self.addEventListener("install", event => {
+  self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(cache => {
+      return cache.addAll([OFFLINE_URL]);
+    })
+  );
+});
+
+self.addEventListener("activate", event => {
+  event.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(
+        keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+      )
+    )
+  );
+  self.clients.claim();
+});
+
+self.addEventListener("fetch", event => {
+  if (event.request.method !== "GET") return;
+
+  event.respondWith(
+    caches.match(event.request).then(cached => {
+      if (cached) return cached;
+
+      return fetch(event.request)
+        .then(response => {
+          const responseClone = response.clone();
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(event.request, responseClone);
+          });
+          return response;
+        })
+        .catch(() => caches.match(OFFLINE_URL));
+    })
+  );
+});
