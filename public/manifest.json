@@ -1,21 +1,29 @@
 {
   "name": "Skycine",
   "short_name": "Skycine",
-  "description": "Aplicativo oficial Skycine",
+  "description": "Aplicativo oficial Skycine - filmes, séries e streaming",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#020617",
   "theme_color": "#020617",
-  "orientation": "portrait",
-  "categories": ["entertainment", "video", "streaming"],
+  "orientation": "any",
+  "categories": ["entertainment", "video", "streaming", "movies", "tv"],
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/logo.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
     }
+   
   ],
   "shortcuts": [
     {
@@ -53,6 +61,18 @@
           "sizes": "192x192"
         }
       ]
+    },
+    {
+      "name": "Séries",
+      "short_name": "Séries",
+      "description": "Explorar séries disponíveis",
+      "url": "/series",
+      "icons": [
+        {
+          "src": "/logo.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ],
   "screenshots": [
@@ -63,5 +83,5 @@
     }
   ],
   "related_applications": [],
-  "prefer_related_applications": false
+  "features": ["video", "offline", "push"]
 }

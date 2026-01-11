@@ -21,7 +21,7 @@ const db = getFirestore(app);
 
 export default function PlayerFilme() {
   const router = useRouter();
-  const { id } = router.query; // Aqui virá "FILME-1001"
+  const { id } = router.query;
   const videoRef = useRef(null);
 
   const [filme, setFilme] = useState(null);
@@ -35,25 +35,21 @@ export default function PlayerFilme() {
     async function carregarFilme() {
       setLoading(true);
       try {
-        // 1. Pegamos todas as categorias para saber onde procurar
         const categoriasSnap = await getDocs(collection(db, "categorias"));
         let dadosEncontrados = null;
 
-        // 2. Percorremos as categorias tentando dar um 'getDoc' direto no ID
         for (const catDoc of categoriasSnap.docs) {
-          // O caminho exato: categorias -> ID_CATEGORIA -> filmes -> FILME-1001
           const docRef = doc(db, "categorias", catDoc.id, "filmes", String(id));
           const docSnap = await getDoc(docRef);
 
           if (docSnap.exists()) {
             dadosEncontrados = { id: docSnap.id, ...docSnap.data() };
-            break; // Achou o filme? Para o loop.
+            break;
           }
         }
 
         if (dadosEncontrados) {
           setFilme(dadosEncontrados);
-          // Verificar se tem tempo salvo no localStorage
           const saved = localStorage.getItem(`tempo-${id}`);
           if (saved && parseFloat(saved) > 10) {
             setTempoSalvo(parseFloat(saved));
@@ -92,7 +88,6 @@ export default function PlayerFilme() {
 
   return (
     <div className="min-h-screen bg-[#050505] text-white">
-      {/* Background desfoque */}
       <div className="fixed inset-0 z-0">
         <div className="absolute inset-0 bg-cover bg-center opacity-10 blur-3xl scale-110" style={{ backgroundImage: `url(${filme.capa})` }} />
         <div className="absolute inset-0 bg-black/60" />
@@ -106,7 +101,13 @@ export default function PlayerFilme() {
               <h2 className="text-xl font-black uppercase italic mb-6">Retomar de onde parou?</h2>
               <div className="flex flex-col gap-3">
                 <button 
-                  onClick={() => { videoRef.current.currentTime = tempoSalvo; videoRef.current.play(); setModalRetomar(false); }}
+                  onClick={() => { 
+                    if (videoRef.current) {
+                      videoRef.current.currentTime = tempoSalvo; 
+                      videoRef.current.play().catch(e => console.log("Erro ao dar play:", e)); 
+                    }
+                    setModalRetomar(false); 
+                  }}
                   className="bg-red-600 py-4 rounded-2xl font-black uppercase text-[10px]"
                 >
                   Sim, Continuar
@@ -133,14 +134,22 @@ export default function PlayerFilme() {
           </div>
 
           <div className="relative aspect-video bg-black rounded-[2.5rem] overflow-hidden border border-white/5 shadow-2xl">
+            {/* TRATAMENTO DO VÍDEO APLICADO ABAIXO */}
             <video 
               ref={videoRef} 
+              key={filme.video} // Força o reload do player se a URL mudar
               src={filme.video} 
               controls 
               autoPlay 
+              playsInline
+              preload="auto"
               onPause={salvarTempo}
-              className="w-full h-full"
-            />
+              onEnded={salvarTempo}
+              className="w-full h-full object-contain"
+              onError={(e) => console.error("Erro ao carregar fonte do vídeo:", e)}
+            >
+              Seu navegador não suporta a reprodução de vídeo.
+            </video>
           </div>
 
           <div className="bg-zinc-900/40 p-10 rounded-[2.5rem] border border-white/5 max-w-3xl">

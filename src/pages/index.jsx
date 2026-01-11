@@ -72,6 +72,10 @@ export default function SkyCineLogin() {
     if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch(() => null);
     }
+    const linkManifest = document.createElement("link");
+    linkManifest.rel = "manifest";
+    linkManifest.href = "/manifest.json";
+    document.head.appendChild(linkManifest);
   }, []);
 
   useEffect(() => {
