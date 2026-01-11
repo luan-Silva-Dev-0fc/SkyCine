@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
@@ -8,7 +8,6 @@ import { getFirestore, doc, getDoc, setDoc, collection, getDocs } from "firebase
 import { motion, AnimatePresence } from "framer-motion";
 import { FiUser, FiAtSign, FiCamera, FiCheck, FiArrowRight, FiX } from "react-icons/fi";
 
-/* ================= FIREBASE ================= */
 const firebaseConfig = {
   apiKey: "AIzaSyDz6mdcZQ_Z3815u50nJCjqy4GEOyndn5k",
   authDomain: "skycine-c59b0.firebaseapp.com",
@@ -22,19 +21,13 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-/* ================= HELPERS ================= */
-const gerarUsername = (nome) => `${nome.split(" ")[0]}_${Math.floor(Math.random() * 9999)}`;
+const gerarUsername = (nome) => `${nome.split(" ")[0].toLowerCase()}_${Math.floor(Math.random() * 9999)}`;
 const gerarID = (nome) => `${nome.split(" ")[0].toLowerCase()}${Math.floor(Math.random() * 9999)}`;
 
-const carregarColecoes = async () => {
-  const snap = await getDocs(collection(db, "colecoes"));
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-};
-
-/* ================= MAIN ================= */
 export default function UserDashboard() {
   const router = useRouter();
   const [user, setUser] = useState(null);
+  const [checking, setChecking] = useState(true); 
   const [step, setStep] = useState(1);
   const [nome, setNome] = useState("");
   const [username, setUsername] = useState("");
@@ -42,25 +35,41 @@ export default function UserDashboard() {
   const [colecoes, setColecoes] = useState([]);
   const [abrirAvatarPicker, setAbrirAvatarPicker] = useState(false);
   const [loading, setLoading] = useState(false);
+  const isRedirecting = useRef(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
-      if (!u) { router.replace("/"); return; }
-      const snap = await getDoc(doc(db, "users", u.uid));
-      if (snap.exists()) { router.replace("/Inicio"); return; }
-      setUser(u);
-      const data = await carregarColecoes();
-      setColecoes(data);
+      if (!u) {
+        router.replace("/");
+        return;
+      }
+
+    
+      const userRef = doc(db, "users", u.uid);
+      const snap = await getDoc(userRef);
+
+      if (snap.exists() && !isRedirecting.current) {
+        isRedirecting.current = true;
+        router.replace("/Inicio");
+      } else {
+        setUser(u);
+        setChecking(false);
+       
+        const colSnap = await getDocs(collection(db, "colecoes"));
+        setColecoes(colSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      }
     });
     return () => unsub();
   }, [router]);
 
   const salvarPerfil = async () => {
+    if (!user) return;
     setLoading(true);
     try {
+      const finalUsername = username || gerarUsername(nome);
       await setDoc(doc(db, "users", user.uid), {
         nome,
-        username: username || gerarUsername(nome),
+        username: finalUsername,
         idPerfil: gerarID(nome),
         avatar,
         criadoEm: new Date(),
@@ -72,20 +81,21 @@ export default function UserDashboard() {
     }
   };
 
+  
+  if (checking) return <div className="min-h-screen bg-[#050505]" />;
+
   return (
     <div className="min-h-screen bg-[#050505] text-white flex items-center justify-center p-6 font-sans">
-      {/* Background Decorativo */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-900/20 rounded-full blur-[120px]" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-red-900/10 rounded-full blur-[120px]" />
       </div>
 
       <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
         className="w-full max-w-[440px] bg-zinc-950 border border-white/5 p-8 rounded-[2.5rem] shadow-2xl relative z-10"
       >
-        {/* Progress Bar */}
         <div className="flex gap-2 mb-8 justify-center">
           <div className={`h-1.5 rounded-full transition-all duration-500 ${step >= 1 ? "w-8 bg-purple-600" : "w-4 bg-zinc-800"}`} />
           <div className={`h-1.5 rounded-full transition-all duration-500 ${step >= 2 ? "w-8 bg-purple-600" : "w-4 bg-zinc-800"}`} />
@@ -95,14 +105,14 @@ export default function UserDashboard() {
           {step === 1 ? (
             <motion.div
               key="step1"
-              initial={{ x: 20, opacity: 0 }}
+              initial={{ x: 10, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
-              exit={{ x: -20, opacity: 0 }}
+              exit={{ x: -10, opacity: 0 }}
               className="space-y-6"
             >
               <div className="text-center">
-                <h2 className="text-3xl font-black tracking-tight">Crie sua conta</h2>
-                <p className="text-zinc-500 text-sm mt-2">Como você quer ser chamado no SkyCine?</p>
+                <h2 className="text-3xl font-black tracking-tight italic">SKY<span className="text-purple-600">CINE</span></h2>
+                <p className="text-zinc-500 text-sm mt-2">Como você quer ser chamado?</p>
               </div>
 
               <div className="space-y-4">
@@ -130,7 +140,7 @@ export default function UserDashboard() {
               <button
                 disabled={!nome}
                 onClick={() => setStep(2)}
-                className="w-full bg-white text-black py-4 rounded-2xl font-black flex items-center justify-center gap-2 hover:bg-purple-600 hover:text-white disabled:opacity-50 disabled:hover:bg-white disabled:hover:text-black transition-all shadow-xl shadow-purple-900/10"
+                className="w-full bg-white text-black py-4 rounded-2xl font-black flex items-center justify-center gap-2 hover:bg-purple-600 hover:text-white disabled:opacity-50 transition-all shadow-xl shadow-purple-900/10"
               >
                 Continuar <FiArrowRight />
               </button>
@@ -138,28 +148,25 @@ export default function UserDashboard() {
           ) : (
             <motion.div
               key="step2"
-              initial={{ x: 20, opacity: 0 }}
+              initial={{ x: 10, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
-              exit={{ x: -20, opacity: 0 }}
+              exit={{ x: -10, opacity: 0 }}
               className="space-y-6"
             >
               <div className="text-center">
-                <h2 className="text-3xl font-black tracking-tight">Escolha seu estilo</h2>
-                <p className="text-zinc-500 text-sm mt-2">Selecione um avatar para o seu perfil.</p>
+                <h2 className="text-3xl font-black tracking-tight">Estilo Visual</h2>
+                <p className="text-zinc-500 text-sm mt-2">Escolha seu avatar exclusivo.</p>
               </div>
 
               <div className="flex justify-center py-4">
                 <div className="relative">
-                  <motion.div 
-                    whileHover={{ scale: 1.05 }}
-                    className="w-32 h-32 rounded-[2.5rem] bg-zinc-900 border-2 border-dashed border-zinc-700 flex items-center justify-center overflow-hidden"
-                  >
+                  <div className="w-32 h-32 rounded-[2.5rem] bg-zinc-900 border-2 border-dashed border-zinc-700 flex items-center justify-center overflow-hidden transition-all">
                     {avatar ? (
                       <img src={avatar} className="w-full h-full object-cover" alt="Avatar" />
                     ) : (
                       <FiUser size={40} className="text-zinc-700" />
                     )}
-                  </motion.div>
+                  </div>
                   <button
                     onClick={() => setAbrirAvatarPicker(true)}
                     className="absolute -bottom-2 -right-2 w-12 h-12 rounded-2xl bg-purple-600 text-white flex items-center justify-center shadow-lg border-4 border-zinc-950 hover:scale-110 transition-transform"
@@ -179,7 +186,7 @@ export default function UserDashboard() {
                 <button
                   disabled={!avatar || loading}
                   onClick={salvarPerfil}
-                  className="flex-[2] bg-purple-600 py-4 rounded-2xl font-black flex items-center justify-center gap-2 hover:bg-purple-700 transition-all shadow-lg shadow-purple-900/20"
+                  className="flex-[2] bg-purple-600 py-4 rounded-2xl font-black flex items-center justify-center gap-2 hover:bg-purple-700 transition-all shadow-lg shadow-purple-900/20 disabled:opacity-50"
                 >
                   {loading ? "Salvando..." : <><FiCheck /> Finalizar</>}
                 </button>
@@ -189,7 +196,6 @@ export default function UserDashboard() {
         </AnimatePresence>
       </motion.div>
 
-      {/* ===== AVATAR PICKER MODAL ===== */}
       <AnimatePresence>
         {abrirAvatarPicker && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -199,13 +205,13 @@ export default function UserDashboard() {
               className="absolute inset-0 bg-black/90 backdrop-blur-md"
             />
             <motion.div
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
               className="bg-zinc-950 w-full max-w-md p-8 rounded-[3rem] border border-white/10 shadow-2xl relative z-10"
             >
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-black uppercase tracking-widest">Avatares</h3>
+                <h3 className="text-xl font-black uppercase tracking-widest text-purple-500">Avatares</h3>
                 <button onClick={() => setAbrirAvatarPicker(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
                   <FiX size={20} />
                 </button>
@@ -215,16 +221,16 @@ export default function UserDashboard() {
                 {colecoes.flatMap((c) =>
                   c.itens?.map((item) => (
                     <motion.div
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
                       key={item.id}
                       onClick={() => {
                         setAvatar(item.link);
                         setAbrirAvatarPicker(false);
                       }}
-                      className="aspect-square rounded-2xl border-2 border-zinc-800 cursor-pointer overflow-hidden hover:border-purple-500 transition-colors shadow-lg"
+                      className="aspect-square rounded-2xl border-2 border-zinc-800 cursor-pointer overflow-hidden hover:border-purple-500 transition-all"
                     >
-                      <img src={item.link} className="w-full h-full object-cover" />
+                      <img src={item.link} className="w-full h-full object-cover" loading="lazy" />
                     </motion.div>
                   ))
                 )}
