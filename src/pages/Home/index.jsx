@@ -74,7 +74,7 @@ export default function UserDashboard() {
         avatar,
         criadoEm: new Date(),
       });
-      router.replace("/Inicio");
+      router.replace("/manuntencao");
     } catch (err) {
       console.error(err);
       setLoading(false);
