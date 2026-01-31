@@ -1,25 +1,12 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { initializeApp, getApps, getApp } from "firebase/app";
-import {
-  getFirestore,
-  collection,
-  getDocs,
-  doc,
-  getDoc,
-} from "firebase/firestore";
+import { getFirestore, collection, getDocs, doc, getDoc } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  FiSearch,
-  FiMenu,
-  FiSettings,
-  FiMessageCircle,
-  FiPlay,
-  FiX,
-} from "react-icons/fi";
+import { FiSearch, FiMenu, FiMessageCircle, FiPlay, FiX, FiPlus, FiAlertCircle } from "react-icons/fi";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDz6mdcZQ_Z3815u50nJCjqy4GEOyndn5k",
@@ -36,17 +23,61 @@ const db = getFirestore(app);
 export default function Home() {
   const router = useRouter();
   const [categorias, setCategorias] = useState([]);
-  const [filmes, setFilmes] = useState([]);
-  const [series, setSeries] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [showMenu, setShowMenu] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-
-  const [showModal, setShowModal] = useState(false);
-  const [codigoAnimado, setCodigoAnimado] = useState("");
   const [perfil, setPerfil] = useState(null);
-  const [showWelcome, setShowWelcome] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [scrolled, setScrolled] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  
+  // ESTADOS DA API
+  const [search, setSearch] = useState("");
+  const [filmesApi, setFilmesApi] = useState([]);
+  const [pagina, setPagina] = useState(1);
+  const [loadingMais, setLoadingMais] = useState(false);
+  const [temMais, setTemMais] = useState(true);
+  
+  const apiKey = '20512dd4';
+
+  useEffect(() => {
+    const fetchFirebase = async () => {
+      try {
+        const catSnap = await getDocs(collection(db, "categorias"));
+        setCategorias(catSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        const auth = getAuth(app);
+        if (auth.currentUser) {
+          const pSnap = await getDoc(doc(db, "users", auth.currentUser.uid));
+          if (pSnap.exists()) setPerfil(pSnap.data());
+        }
+      } catch (err) { console.error(err); }
+      finally { setLoading(false); }
+    };
+    fetchFirebase();
+  }, []);
+
+  const fetchMovies = async (resetar = false) => {
+    const novaPagina = resetar ? 1 : pagina;
+    const termoBusca = search.length >= 3 ? search : "action"; 
+    
+    setLoadingMais(true);
+    try {
+      const res = await fetch(`https://www.omdbapi.com/?s=${termoBusca}&page=${novaPagina}&apikey=${apiKey}`);
+      const data = await res.json();
+      
+      if (data.Response === "True") {
+        setFilmesApi(prev => resetar ? data.Search : [...prev, ...data.Search]);
+        setTemMais(true);
+        setPagina(novaPagina + 1);
+      } else {
+        if (resetar) setFilmesApi([]);
+        setTemMais(false);
+      }
+    } catch (err) { console.error(err); }
+    finally { setLoadingMais(false); }
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => fetchMovies(true), 500);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50);
@@ -54,354 +85,160 @@ export default function Home() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  useEffect(() => {
-    const fetchPerfil = async () => {
-      try {
-        const auth = getAuth(app);
-        const user = auth.currentUser;
-        if (!user) return;
-        const ref = doc(db, "users", user.uid);
-        const snap = await getDoc(ref);
-        if (snap.exists()) {
-          setPerfil(snap.data());
-          const lastWelcome = localStorage.getItem("lastWelcome");
-          const now = Date.now();
-          if (!lastWelcome || now - Number(lastWelcome) > 24 * 60 * 60 * 1000) {
-            setShowWelcome(true);
-            localStorage.setItem("lastWelcome", now.toString());
-            setTimeout(() => setShowWelcome(false), 5000);
-          }
-        }
-      } catch (err) {
-        console.error("Erro perfil:", err);
-      }
-    };
-    fetchPerfil();
-  }, [db]);
-
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const categoriasSnap = await getDocs(collection(db, "categorias"));
-      const categoriasArray = categoriasSnap.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setCategorias(categoriasArray);
-
-      // BUSCA PARALELA (Muito mais rápido que usar FOR await)
-      const promessas = categoriasArray.map(async (cat) => {
-        const [fSnap, sSnap] = await Promise.all([
-          getDocs(collection(db, "categorias", cat.id, "filmes")),
-          getDocs(collection(db, "categorias", cat.id, "series")),
-        ]);
-
-        return {
-          filmes: fSnap.docs.map((d) => ({
-            id: d.id,
-            tipo: "filme",
-            categoriaId: cat.id,
-            ...d.data(),
-          })),
-          series: sSnap.docs.map((d) => ({
-            id: d.id,
-            tipo: "serie",
-            categoriaId: cat.id,
-            ...d.data(),
-          })),
-        };
-      });
-
-      const resultados = await Promise.all(promessas);
-
-      const todosFilmes = resultados.flatMap((r) => r.filmes);
-      const todasSeries = resultados.flatMap((r) => r.series);
-
-      setFilmes(todosFilmes);
-      setSeries(todasSeries);
-    } catch (error) {
-      console.error("Erro ao carregar dados:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const filmeDestaque = useMemo(() => {
-    if (!filmes.length) return null;
-    return filmes[Math.floor(Math.random() * filmes.length)];
-  }, [filmes]);
-
-  // Gesto secreto
-  useEffect(() => {
-    let startX = null;
-    const touchStart = (e) => (startX = e.touches[0].clientX);
-    const touchMove = (e) => {
-      if (startX === null) return;
-      const deltaX = e.touches[0].clientX - startX;
-      if (deltaX > 200 && !showModal) {
-        setShowModal(true);
-        const linhas = [
-          "Iniciando Protocolo...",
-          "Bypass de Segurança...",
-          "Portal da Loja Aberto!",
-        ];
-        let i = 0;
-        const int = setInterval(() => {
-          setCodigoAnimado(linhas[i]);
-          i++;
-          if (i >= linhas.length) {
-            clearInterval(int);
-            router.push("/loja");
-          }
-        }, 800);
-      }
-    };
-    window.addEventListener("touchstart", touchStart);
-    window.addEventListener("touchmove", touchMove);
-    return () => {
-      window.removeEventListener("touchstart", touchStart);
-      window.removeEventListener("touchmove", touchMove);
-    };
-  }, [router, showModal]);
-
-  if (loading)
-    return (
-      <div className="h-screen bg-black flex flex-col items-center justify-center">
-        <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin mb-4" />
-        <h1 className="text-white font-black tracking-[0.3em] uppercase animate-pulse">
-          SkyCine
-        </h1>
-      </div>
-    );
+  if (loading) return (
+    <div className="h-screen bg-[#050505] flex items-center justify-center">
+      <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }} className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full" />
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-[#070707] text-white font-sans selection:bg-red-600 overflow-x-hidden">
-      <nav
-        className={`fixed top-0 w-full z-50 transition-all duration-500 px-6 py-4 flex items-center justify-between ${scrolled ? "bg-black/95 backdrop-blur-xl border-b border-white/5 shadow-2xl" : "bg-transparent"}`}
-      >
-        <div className="flex items-center gap-6">
-          <button
-            onClick={() => setShowMenu(true)}
-            className="p-2 hover:bg-white/10 rounded-full transition-colors"
-          >
-            <FiMenu size={24} />
-          </button>
-          <h1
-            className="text-2xl font-black italic tracking-tighter uppercase cursor-pointer"
-            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-          >
-            Sky<span className="text-red-600">Cine</span>
-          </h1>
-        </div>
+    <div className="min-h-screen bg-[#050505] text-white font-sans selection:bg-red-600">
+      
+      {/* AVISO ÉTICO FIXO */}
+      <div className="bg-red-600/10 border-b border-red-600/20 py-2 px-4 flex items-center justify-center gap-3 text-[10px] md:text-xs font-bold text-red-500 text-center">
+        <FiAlertCircle className="flex-shrink-0" />
+        PROJETO EDUCACIONAL: Este site é voltado para treinamento e ética. Não hospedamos filmes completos por respeito aos direitos autorais.
+      </div>
 
-        <div className="hidden md:flex flex-1 max-w-md mx-8 relative">
-          <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" />
-          <input
-            type="text"
-            placeholder="O que você quer assistir?"
-            className="w-full bg-white/5 border border-white/10 pl-12 pr-4 py-2.5 rounded-2xl focus:bg-white/10 focus:border-red-600/50 transition-all outline-none text-sm"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
+      {/* Navbar */}
+      <nav className={`fixed top-0 w-full z-50 transition-all px-6 py-4 flex flex-col gap-4 ${scrolled ? "bg-black/95 backdrop-blur-xl border-b border-white/5 shadow-2xl" : "bg-transparent"} mt-10 md:mt-0`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-6">
+            <button onClick={() => setShowMenu(true)} className="p-2 hover:bg-white/10 rounded-full transition-all text-red-600"><FiMenu size={24} /></button>
+            <h1 className="text-2xl font-black italic tracking-tighter uppercase">Sky<span className="text-red-600">Cine</span></h1>
+          </div>
 
-        <div className="flex items-center gap-4">
+          <div className="flex-1 max-w-xl mx-8 relative hidden md:block">
+            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" />
+            <input
+              type="text"
+              placeholder="Pesquisar no catálogo infinito da OMDb..."
+              className="w-full bg-white/5 border border-white/10 pl-12 pr-4 py-3 rounded-2xl outline-none focus:border-red-600 transition-all text-sm focus:bg-white/10"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
           {perfil && (
-            <div className="flex items-center gap-3 bg-white/5 p-1.5 pr-5 rounded-full border border-white/10 hover:bg-white/10 transition-colors">
-              <div className="w-8 h-8 rounded-full border-2 border-red-600 overflow-hidden shadow-lg">
-                <img
-                  src={perfil.avatar || "https://via.placeholder.com/150"}
-                  className="w-full h-full object-cover"
-                  alt="avatar"
-                />
-              </div>
-              <span className="text-[10px] font-black uppercase tracking-widest hidden sm:block">
-                {perfil.nome}
-              </span>
+            <div className="flex items-center gap-3 bg-white/5 p-1 rounded-full pr-4 border border-white/5">
+              <img src={perfil.avatar || "https://via.placeholder.com/150"} className="w-8 h-8 rounded-full border-2 border-red-600 object-cover" alt="avatar" />
+              <span className="text-[10px] font-black uppercase tracking-widest hidden sm:block">{perfil.nome}</span>
             </div>
           )}
         </div>
+
+        {/* BARRA DE CATEGORIAS DINÂMICAS (Firebase) */}
+        <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+          {categorias.map(cat => (
+            <button 
+              key={cat.id} 
+              onClick={() => setSearch(cat.nome)}
+              className="whitespace-nowrap px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-red-600 hover:border-red-600 transition-all"
+            >
+              {cat.nome}
+            </button>
+          ))}
+        </div>
       </nav>
 
-      {/* Hero Section */}
-      {filmeDestaque && (
-        <section className="relative w-full h-[85vh] flex items-end pb-24 px-6 md:px-16 overflow-hidden">
-          <video
-            src={filmeDestaque.video}
-            autoPlay
-            loop
-            muted
-            playsInline
-            className="absolute inset-0 w-full h-full object-cover scale-105 pointer-events-none"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#070707] via-[#070707]/40 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#070707] via-transparent to-transparent" />
-
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="relative z-10 max-w-2xl"
-          >
-            <div className="flex items-center gap-3 mb-4">
-              <span className="bg-red-600 text-[9px] font-black uppercase px-2 py-1 rounded-sm tracking-[0.2em]">
-                Original
-              </span>
-              <span className="text-zinc-400 text-xs font-bold uppercase tracking-widest underline decoration-red-600">
-                Destaque
-              </span>
-            </div>
-            <h2 className="text-5xl md:text-8xl font-black uppercase italic mb-8 leading-none tracking-tighter drop-shadow-2xl">
-              {filmeDestaque.titulo}
+      <main className="pt-52 px-6 md:px-16 pb-32">
+        <div className="flex items-center justify-between mb-12">
+          <div className="flex flex-col">
+            <h2 className="text-4xl font-black uppercase italic tracking-tighter leading-none">
+              {search ? search : "Infinite Library"}
             </h2>
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => router.push(`/idfilmes?id=${filmeDestaque.id}`)}
-                className="bg-white text-black px-10 py-4 rounded-2xl font-black flex items-center gap-3 hover:bg-red-600 hover:text-white hover:scale-105 active:scale-95 transition-all shadow-2xl uppercase text-xs tracking-widest"
-              >
-                <FiPlay fill="currentColor" size={18} /> Reproduzir
-              </button>
-            </div>
-          </motion.div>
-        </section>
-      )}
+            <span className="text-[10px] text-red-600 font-bold uppercase tracking-[0.4em] mt-2 ml-1">Streaming Experience</span>
+          </div>
+          <div className="h-[1px] flex-1 bg-gradient-to-r from-red-600/50 to-transparent mx-8 hidden sm:block" />
+        </div>
 
-      {/* Listagem Global */}
-      <main className="relative z-20 -mt-20 pb-32 space-y-20">
-        {categorias.map((cat) => {
-          const itensDaCategoria = [
-            ...filmes.filter((f) => f.categoriaId === cat.id),
-            ...series.filter((s) => s.categoriaId === cat.id),
-          ].filter((item) =>
-            item.titulo.toLowerCase().includes(search.toLowerCase()),
-          );
-
-          if (itensDaCategoria.length === 0) return null;
-
-          return (
-            <section key={cat.id} className="px-6 md:px-16">
-              <div className="flex items-center justify-between mb-8">
-                <h3 className="text-2xl font-black uppercase tracking-tighter italic">
-                  {cat.nome}
-                  <span className="text-red-600">.</span>
-                </h3>
-                <div className="h-[1px] flex-1 bg-white/5 mx-6 hidden sm:block" />
+        {/* Grid de Filmes */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-6">
+          {filmesApi.map((movie, index) => (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: (index % 10) * 0.03 }}
+              key={`${movie.imdbID}-${index}`}
+              className="group relative"
+              onClick={() => window.open(`https://www.imdb.com/title/${movie.imdbID}`, "_blank")}
+            >
+              <div className="relative aspect-[2/3] rounded-[1.5rem] overflow-hidden border border-white/5 shadow-2xl transition-all group-hover:border-red-600 group-hover:shadow-[0_0_30px_rgba(229,9,20,0.3)]">
+                <img 
+                  src={movie.Poster !== "N/A" ? movie.Poster : "https://via.placeholder.com/400x600?text=Poster+Not+Available"} 
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+                  alt={movie.Title} 
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-5">
+                   <p className="text-[8px] text-red-500 font-black mb-1">DETALHES</p>
+                   <h5 className="text-[11px] font-black leading-tight uppercase mb-4">{movie.Title}</h5>
+                   <div className="bg-red-600 text-white w-full py-2.5 rounded-lg text-center font-black text-[9px] uppercase tracking-widest shadow-xl">Informações</div>
+                </div>
               </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
-                {itensDaCategoria.map((item) => (
-                  <motion.div
-                    whileHover={{ scale: 1.05, y: -5 }}
-                    key={item.id}
-                    className="group cursor-pointer"
-                    onClick={() => {
-                      // Verificação robusta se é série ou filme
-                      const isSerie =
-                        item.tipo === "serie" ||
-                        item.temporadas ||
-                        item.capitulos;
-                      router.push(
-                        isSerie
-                          ? `/idseries?id=${item.id}`
-                          : `/idfilmes?id=${item.id}`,
-                      );
-                    }}
-                  >
-                    <div className="relative aspect-[2/3] rounded-[1.5rem] overflow-hidden border border-white/5 shadow-xl transition-all group-hover:border-red-600/50">
-                      <img
-                        src={item.capa}
-                        className="w-full h-full object-cover transition duration-700 group-hover:scale-110"
-                        alt={item.titulo}
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
-                        <div className="w-full bg-white text-black py-3 rounded-xl text-center font-black text-[10px] uppercase tracking-widest">
-                          {item.tipo === "serie" ? "Temporadas" : "Assistir"}
-                        </div>
-                      </div>
-                    </div>
-                    <p className="mt-4 text-[10px] font-black text-zinc-500 group-hover:text-white transition uppercase tracking-widest truncate">
-                      {item.titulo}
-                    </p>
-                  </motion.div>
-                ))}
+              <div className="mt-4 px-2">
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 group-hover:text-white truncate transition-colors">{movie.Title}</h4>
+                <div className="flex justify-between items-center mt-1">
+                  <span className="text-red-600 text-[9px] font-bold">{movie.Year}</span>
+                  <span className="text-[8px] bg-white/5 px-2 py-0.5 rounded text-zinc-400 font-bold uppercase">{movie.Type}</span>
+                </div>
               </div>
-            </section>
-          );
-        })}
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Botão Carregar Mais */}
+        {temMais && (
+          <div className="mt-24 flex flex-col items-center gap-4">
+            <button
+              onClick={() => fetchMovies()}
+              disabled={loadingMais}
+              className="relative overflow-hidden group bg-white text-black px-16 py-5 rounded-2xl font-black uppercase text-[10px] tracking-[0.3em] transition-all hover:bg-red-600 hover:text-white active:scale-95 disabled:opacity-50"
+            >
+              <span className="relative z-10 flex items-center gap-3">
+                {loadingMais ? "Sincronizando..." : "Expandir Universo"}
+              </span>
+            </button>
+            <p className="text-[9px] text-zinc-600 font-black uppercase tracking-widest">Página {pagina - 1} de ∞</p>
+          </div>
+        )}
       </main>
 
-      {/* Botão SkyChat */}
-      <motion.button
-        whileHover={{ scale: 1.1, rotate: 5 }}
-        whileTap={{ scale: 0.9 }}
-        onClick={() => router.push("/chat")}
-        className="fixed bottom-8 right-8 z-50 flex items-center gap-3 px-6 py-4 bg-white text-black rounded-3xl shadow-2xl hover:bg-zinc-100 transition-all"
-      >
-        <FiMessageCircle size={26} />
-        <span className="text-[11px] font-black uppercase tracking-widest hidden sm:block">
-          SkyChat
-        </span>
-      </motion.button>
-
-      {/* Menu Lateral */}
+      {/* Menu Lateral Firebase */}
       <AnimatePresence>
         {showMenu && (
           <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowMenu(false)}
-              className="fixed inset-0 bg-black/90 backdrop-blur-md z-[60]"
-            />
-            <motion.div
-              initial={{ x: -400 }}
-              animate={{ x: 0 }}
-              exit={{ x: -400 }}
-              className="fixed top-0 left-0 h-full w-80 bg-[#0c0c0c] z-[70] p-10 border-r border-white/5 shadow-2xl"
-            >
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowMenu(false)} className="fixed inset-0 bg-black/95 z-[60] backdrop-blur-md" />
+            <motion.div initial={{ x: -400 }} animate={{ x: 0 }} exit={{ x: -400 }} className="fixed top-0 left-0 h-full w-80 bg-[#080808] z-[70] p-10 border-r border-white/5">
               <div className="flex justify-between items-center mb-16">
-                <h2 className="text-3xl font-black italic uppercase tracking-tighter">
-                  Sky<span className="text-red-600">Menu</span>
-                </h2>
-                <button onClick={() => setShowMenu(false)}>
-                  <FiX size={24} />
-                </button>
+                <h2 className="text-2xl font-black italic uppercase tracking-tighter">Sky<span className="text-red-600">Library</span></h2>
+                <button onClick={() => setShowMenu(false)} className="text-zinc-500 hover:text-white"><FiX size={24} /></button>
               </div>
-              <ul className="space-y-6">
-                {categorias.map((cat) => (
-                  <li
-                    key={cat.id}
-                    className="text-zinc-500 hover:text-white text-lg font-black uppercase tracking-widest cursor-pointer transition-all flex items-center gap-4 group"
-                  >
-                    <span className="w-0 group-hover:w-4 h-[2px] bg-red-600 transition-all rounded-full" />
-                    {cat.nome}
-                  </li>
-                ))}
-              </ul>
+              <nav>
+                <p className="text-[9px] font-black text-red-600 uppercase tracking-[0.3em] mb-8">Navegação Local</p>
+                <ul className="space-y-6">
+                  {categorias.map(cat => (
+                    <li 
+                      key={cat.id} 
+                      onClick={() => { setSearch(cat.nome); setShowMenu(false); }}
+                      className="text-zinc-500 hover:text-white font-black uppercase tracking-widest cursor-pointer text-sm transition-all flex items-center gap-4 group"
+                    >
+                      <div className="w-1.5 h-1.5 bg-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-all" />
+                      {cat.nome}
+                    </li>
+                  ))}
+                </ul>
+              </nav>
             </motion.div>
           </>
         )}
       </AnimatePresence>
 
       <style jsx global>{`
-        ::-webkit-scrollbar {
-          width: 5px;
-        }
-        ::-webkit-scrollbar-thumb {
-          background: #222;
-          border-radius: 10px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-          background: #ff0000;
-        }
-        body {
-          background-color: #070707;
-          margin: 0;
-        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-thumb { background: #E50914; border-radius: 10px; }
+        body { background-color: #050505; }
       `}</style>
     </div>
   );
