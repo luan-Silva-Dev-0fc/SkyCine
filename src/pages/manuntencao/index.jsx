@@ -33,8 +33,8 @@ export default function Manutencao() {
           </motion.div>
           
           <h1 className="text-3xl sm:text-4xl md:text-6xl font-black uppercase italic tracking-tighter leading-none mb-4 px-2">
-            Sistema em <br className="block sm:hidden" />
-            <span className="text-red-600">Manutenção</span>
+            Não Estamos <br className="block sm:hidden" />
+            <span className="text-red-600">Disponivel</span>
           </h1>
           <p className="text-zinc-500 font-bold uppercase text-[8px] md:text-[10px] tracking-[0.2em] md:tracking-[0.3em]">
             Protocolo de Estabilização SkyNet v2.0

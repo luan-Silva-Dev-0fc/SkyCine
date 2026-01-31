@@ -6,8 +6,9 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { getFirestore, doc, getDoc, setDoc, collection, getDocs } from "firebase/firestore";
 import { motion, AnimatePresence } from "framer-motion";
-import { FiUser, FiAtSign, FiCamera, FiCheck, FiArrowRight, FiX } from "react-icons/fi";
+import { FiUser, FiAtSign, FiCamera, FiCheck, FiArrowRight, FiX, FiLoader } from "react-icons/fi";
 
+// Configuração do Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyDz6mdcZQ_Z3815u50nJCjqy4GEOyndn5k",
   authDomain: "skycine-c59b0.firebaseapp.com",
@@ -27,7 +28,7 @@ const gerarID = (nome) => `${nome.split(" ")[0].toLowerCase()}${Math.floor(Math.
 export default function UserDashboard() {
   const router = useRouter();
   const [user, setUser] = useState(null);
-  const [checking, setChecking] = useState(true); 
+  const [checking, setChecking] = useState(true);
   const [step, setStep] = useState(1);
   const [nome, setNome] = useState("");
   const [username, setUsername] = useState("");
@@ -43,8 +44,6 @@ export default function UserDashboard() {
         router.replace("/");
         return;
       }
-
-    
       const userRef = doc(db, "users", u.uid);
       const snap = await getDoc(userRef);
 
@@ -54,7 +53,6 @@ export default function UserDashboard() {
       } else {
         setUser(u);
         setChecking(false);
-       
         const colSnap = await getDocs(collection(db, "colecoes"));
         setColecoes(colSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       }
@@ -74,163 +72,191 @@ export default function UserDashboard() {
         avatar,
         criadoEm: new Date(),
       });
-      router.replace("/manuntencao");
+      router.replace("/Inicio");
     } catch (err) {
       console.error(err);
       setLoading(false);
     }
   };
 
-  
-  if (checking) return <div className="min-h-screen bg-[#050505]" />;
+  if (checking) return (
+    <div className="min-h-screen bg-[#050505] flex items-center justify-center">
+      <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
+        <FiLoader className="text-purple-600 size-8" />
+      </motion.div>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white flex items-center justify-center p-6 font-sans">
+    <div className="min-h-screen bg-[#020202] text-white flex items-center justify-center p-4 font-sans selection:bg-purple-500/30">
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-900/20 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-red-900/10 rounded-full blur-[120px]" />
+        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-purple-600/10 rounded-full blur-[140px] animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-600/5 rounded-full blur-[140px]" />
       </div>
 
       <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-[440px] bg-zinc-950 border border-white/5 p-8 rounded-[2.5rem] shadow-2xl relative z-10"
+        layout
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="w-full max-w-112.5 bg-zinc-900/40 backdrop-blur-xl border border-white/10 p-10 rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative z-10"
       >
-        <div className="flex gap-2 mb-8 justify-center">
-          <div className={`h-1.5 rounded-full transition-all duration-500 ${step >= 1 ? "w-8 bg-purple-600" : "w-4 bg-zinc-800"}`} />
-          <div className={`h-1.5 rounded-full transition-all duration-500 ${step >= 2 ? "w-8 bg-purple-600" : "w-4 bg-zinc-800"}`} />
+        <div className="flex gap-2 mb-10 justify-center">
+          {[1, 2].map((i) => (
+            <div key={i} className="h-1 bg-zinc-800 rounded-full w-12 overflow-hidden">
+              <motion.div 
+                initial={false}
+                animate={{ width: step >= i ? "100%" : "0%" }}
+                className="h-full bg-linear-to-r from-purple-600 to-blue-500"
+              />
+            </div>
+          ))}
         </div>
 
         <AnimatePresence mode="wait">
           {step === 1 ? (
             <motion.div
               key="step1"
-              initial={{ x: 10, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: -10, opacity: 0 }}
-              className="space-y-6"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-8"
             >
-              <div className="text-center">
-                <h2 className="text-3xl font-black tracking-tight italic">SKY<span className="text-purple-600">CINE</span></h2>
-                <p className="text-zinc-500 text-sm mt-2">Como você quer ser chamado?</p>
+              <div className="text-center space-y-2">
+                <h2 className="text-4xl font-black tracking-tighter uppercase italic">
+                  SKY<span className="text-transparent bg-clip-text bg-linear-to-r from-purple-500 to-blue-400">CINE</span>
+                </h2>
+                <p className="text-zinc-400 text-sm font-medium">Personalize sua identidade na plataforma</p>
               </div>
 
               <div className="space-y-4">
-                <div className="relative group">
-                  <FiUser className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-purple-500 transition-colors" />
+                <div className="group relative">
+                  <FiUser className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-purple-400 transition-colors" />
                   <input
-                    placeholder="Seu nome completo"
+                    placeholder="Seu nome real"
                     value={nome}
                     onChange={(e) => setNome(e.target.value)}
-                    className="w-full pl-12 pr-4 py-4 rounded-2xl bg-white/5 border border-white/10 outline-none focus:border-purple-600/50 focus:bg-white/[0.08] transition-all"
+                    className="w-full pl-12 pr-4 py-4 rounded-2xl bg-zinc-950/50 border border-white/5 outline-none focus:border-purple-500/50 focus:ring-4 ring-purple-500/10 transition-all placeholder:text-zinc-600"
                   />
                 </div>
 
-                <div className="relative group">
-                  <FiAtSign className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-purple-500 transition-colors" />
+                <div className="group relative">
+                  <FiAtSign className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-purple-400 transition-colors" />
                   <input
-                    placeholder="Username personalizado (opcional)"
+                    placeholder="Username único (ex: sky_walker)"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    className="w-full pl-12 pr-4 py-4 rounded-2xl bg-white/5 border border-white/10 outline-none focus:border-purple-600/50 focus:bg-white/[0.08] transition-all"
+                    className="w-full pl-12 pr-4 py-4 rounded-2xl bg-zinc-950/50 border border-white/5 outline-none focus:border-purple-500/50 focus:ring-4 ring-purple-500/10 transition-all placeholder:text-zinc-600"
                   />
                 </div>
               </div>
 
-              <button
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
                 disabled={!nome}
                 onClick={() => setStep(2)}
-                className="w-full bg-white text-black py-4 rounded-2xl font-black flex items-center justify-center gap-2 hover:bg-purple-600 hover:text-white disabled:opacity-50 transition-all shadow-xl shadow-purple-900/10"
+                className="w-full bg-white text-black py-4 rounded-2xl font-bold flex items-center justify-center gap-2 disabled:opacity-30 transition-all shadow-lg hover:shadow-white/10"
               >
                 Continuar <FiArrowRight />
-              </button>
+              </motion.button>
             </motion.div>
           ) : (
             <motion.div
               key="step2"
-              initial={{ x: 10, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: -10, opacity: 0 }}
-              className="space-y-6"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-8"
             >
-              <div className="text-center">
-                <h2 className="text-3xl font-black tracking-tight">Estilo Visual</h2>
-                <p className="text-zinc-500 text-sm mt-2">Escolha seu avatar exclusivo.</p>
+              <div className="text-center space-y-2">
+                <h2 className="text-3xl font-black tracking-tight text-white">Visual Profile</h2>
+                <p className="text-zinc-400 text-sm">Escolha uma imagem de coleções exclusivas.</p>
               </div>
 
-              <div className="flex justify-center py-4">
-                <div className="relative">
-                  <div className="w-32 h-32 rounded-[2.5rem] bg-zinc-900 border-2 border-dashed border-zinc-700 flex items-center justify-center overflow-hidden transition-all">
-                    {avatar ? (
-                      <img src={avatar} className="w-full h-full object-cover" alt="Avatar" />
-                    ) : (
-                      <FiUser size={40} className="text-zinc-700" />
-                    )}
+              <div className="flex justify-center">
+                <div className="relative group">
+                  <div className="w-36 h-36 rounded-full p-1 bg-linear-to-tr from-purple-600 via-transparent to-blue-500">
+                    <div className="w-full h-full rounded-full bg-zinc-900 flex items-center justify-center overflow-hidden border-4 border-zinc-950">
+                      {avatar ? (
+                        <motion.img layoutId="avatar" src={avatar} className="w-full h-full object-cover" alt="Avatar" />
+                      ) : (
+                        <FiUser size={40} className="text-zinc-700" />
+                      )}
+                    </div>
                   </div>
-                  <button
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
                     onClick={() => setAbrirAvatarPicker(true)}
-                    className="absolute -bottom-2 -right-2 w-12 h-12 rounded-2xl bg-purple-600 text-white flex items-center justify-center shadow-lg border-4 border-zinc-950 hover:scale-110 transition-transform"
+                    className="absolute bottom-1 right-1 w-11 h-11 rounded-full bg-purple-600 text-white flex items-center justify-center shadow-2xl border-2 border-zinc-950"
                   >
-                    <FiCamera size={20} />
-                  </button>
+                    <FiCamera size={18} />
+                  </motion.button>
                 </div>
               </div>
 
               <div className="flex gap-3">
                 <button
                   onClick={() => setStep(1)}
-                  className="flex-1 bg-zinc-900 py-4 rounded-2xl font-bold text-zinc-400 hover:text-white transition-all"
+                  className="flex-1 bg-zinc-800/50 py-4 rounded-2xl font-bold text-zinc-400 hover:bg-zinc-800 hover:text-white transition-all"
                 >
                   Voltar
                 </button>
-                <button
+                <motion.button
+                  whileHover={!(!avatar || loading) ? { scale: 1.02 } : {}}
+                  whileTap={!(!avatar || loading) ? { scale: 0.98 } : {}}
                   disabled={!avatar || loading}
                   onClick={salvarPerfil}
-                  className="flex-[2] bg-purple-600 py-4 rounded-2xl font-black flex items-center justify-center gap-2 hover:bg-purple-700 transition-all shadow-lg shadow-purple-900/20 disabled:opacity-50"
+                  className="flex-2 bg-linear-to-r from-purple-600 to-indigo-600 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-xl shadow-purple-600/20 disabled:opacity-30 transition-opacity"
                 >
-                  {loading ? "Salvando..." : <><FiCheck /> Finalizar</>}
-                </button>
+                  {loading ? <FiLoader className="animate-spin" /> : <><FiCheck /> Finalizar</>}
+                </motion.button>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
       </motion.div>
 
+      {/* Modal de Avatar com tokens v4 */}
       <AnimatePresence>
         {abrirAvatarPicker && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-100 flex items-center justify-center p-6">
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setAbrirAvatarPicker(false)}
-              className="absolute inset-0 bg-black/90 backdrop-blur-md"
+              className="absolute inset-0 bg-black/60 backdrop-blur-xl"
             />
             <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-zinc-950 w-full max-w-md p-8 rounded-[3rem] border border-white/10 shadow-2xl relative z-10"
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="bg-zinc-900 w-full max-w-lg p-8 rounded-[2.5rem] border border-white/10 shadow-3xl relative z-10"
             >
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-black uppercase tracking-widest text-purple-500">Avatares</h3>
-                <button onClick={() => setAbrirAvatarPicker(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+              <div className="flex justify-between items-center mb-8">
+                <div>
+                  <h3 className="text-xl font-bold text-white">Galeria de Avatares</h3>
+                  <p className="text-xs text-zinc-500">Selecione um item das coleções SkyCine</p>
+                </div>
+                <button onClick={() => setAbrirAvatarPicker(false)} className="p-2 bg-white/5 hover:bg-white/10 rounded-full transition-colors">
                   <FiX size={20} />
                 </button>
               </div>
 
-              <div className="grid grid-cols-4 gap-4 max-h-[400px] overflow-y-auto pr-2 custom-scroll">
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 max-h-112.5 overflow-y-auto pr-4 custom-scroll">
                 {colecoes.flatMap((c) =>
                   c.itens?.map((item) => (
                     <motion.div
-                      whileHover={{ scale: 1.05 }}
+                      whileHover={{ scale: 1.05, y: -5 }}
                       whileTap={{ scale: 0.95 }}
                       key={item.id}
                       onClick={() => {
                         setAvatar(item.link);
                         setAbrirAvatarPicker(false);
                       }}
-                      className="aspect-square rounded-2xl border-2 border-zinc-800 cursor-pointer overflow-hidden hover:border-purple-500 transition-all"
+                      className={`aspect-square rounded-3xl cursor-pointer overflow-hidden border-2 transition-all group relative ${avatar === item.link ? 'border-purple-500 shadow-[0_0_20px_rgba(147,51,234,0.3)]' : 'border-white/5 hover:border-white/20'}`}
                     >
                       <img src={item.link} className="w-full h-full object-cover" loading="lazy" />
+                      <div className="absolute inset-0 bg-purple-600/20 opacity-0 group-hover:opacity-100 transition-opacity" />
                     </motion.div>
                   ))
                 )}
@@ -241,10 +267,10 @@ export default function UserDashboard() {
       </AnimatePresence>
 
       <style jsx global>{`
-        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar { width: 5px; }
         .custom-scroll::-webkit-scrollbar-track { background: transparent; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
-        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #9333ea; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #27272a; border-radius: 10px; }
+        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
       `}</style>
     </div>
   );
